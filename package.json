@@ -1,0 +1,14 @@
+{
+  "name": "aicli-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Workspace for AI-oriented service CLIs.",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "check": "npm --workspace @0xfe10/aicli run check"
+  }
+}

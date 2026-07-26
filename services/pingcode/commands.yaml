@@ -1,0 +1,76 @@
+commands:
+  - name: pingcode config check
+    mode: read
+    description: Validate local PingCode configuration.
+    output: json
+  - name: pingcode auth status
+    mode: read
+    description: Report whether authentication is configured and usable.
+    output: json
+  - name: pingcode auth login
+    mode: auth
+    description: Start or complete PingCode user authentication.
+    output: json
+  - name: pingcode auth logout
+    mode: auth
+    description: Remove stored PingCode user authentication.
+    output: json
+  - name: pingcode project list
+    mode: read
+    description: List available PingCode projects.
+    output: json
+  - name: pingcode project schema
+    mode: read
+    description: Show project work item schema metadata.
+    output: json
+  - name: pingcode work-item get
+    mode: read
+    description: Fetch a work item by identifier.
+    output: json
+  - name: pingcode work-item search
+    mode: read
+    description: Search work items.
+    output: json
+  - name: pingcode work-item mine
+    mode: read
+    description: List work items assigned to the authenticated user.
+    output: json
+  - name: pingcode work-item create
+    mode: write
+    description: Plan or apply work item creation.
+    dry_run_default: true
+    apply_flag: --apply
+    output: json
+  - name: pingcode work-item update
+    mode: write
+    description: Plan or apply work item field updates.
+    dry_run_default: true
+    apply_flag: --apply
+    expected_state_guard: expected-current-state
+    output: json
+  - name: pingcode work-item transition
+    mode: write
+    description: Plan or apply a work item status transition.
+    dry_run_default: true
+    apply_flag: --apply
+    expected_state_guard: expected-current-state
+    output: json
+  - name: pingcode work-item comment
+    mode: write
+    description: Plan or apply a work item comment.
+    dry_run_default: true
+    apply_flag: --apply
+    output: json
+  - name: pingcode work-item triage
+    mode: write
+    description: Plan or apply a triage update.
+    dry_run_default: true
+    apply_flag: --apply
+    expected_state_guard: expected-current-state
+    output: json
+  - name: pingcode work-item bulk-update
+    mode: write
+    description: Plan or apply multiple work item updates.
+    dry_run_default: true
+    apply_flag: --apply
+    output: json
