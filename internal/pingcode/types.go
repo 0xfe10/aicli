@@ -112,17 +112,31 @@ type WorkItem struct {
 	PublicImageToken *string        `json:"public_image_token,omitempty"`
 }
 
-// WorkItemPayload is the create/update request body.
+// WorkItemPayload is the create request body (omitempty is safe for create).
 type WorkItemPayload struct {
-	ProjectID  string         `json:"project_id,omitempty"`
-	TypeID     string         `json:"type_id,omitempty"`
-	Title      string         `json:"title,omitempty"`
-	Description string        `json:"description,omitempty"`
-	StateID    string         `json:"state_id,omitempty"`
-	PriorityID string         `json:"priority_id,omitempty"`
-	AssigneeID string         `json:"assignee_id,omitempty"`
-	ParentID   string         `json:"parent_id,omitempty"`
-	Properties map[string]any `json:"properties,omitempty"`
+	ProjectID   string         `json:"project_id,omitempty"`
+	TypeID      string         `json:"type_id,omitempty"`
+	Title       string         `json:"title,omitempty"`
+	Description string         `json:"description,omitempty"`
+	StateID     string         `json:"state_id,omitempty"`
+	PriorityID  string         `json:"priority_id,omitempty"`
+	AssigneeID  string         `json:"assignee_id,omitempty"`
+	ParentID    string         `json:"parent_id,omitempty"`
+	Properties  map[string]any `json:"properties,omitempty"`
+}
+
+// WorkItemPatch is a sparse PATCH body.
+// Present keys are sent to the API; nil values serialize as JSON null (clear).
+type WorkItemPatch map[string]any
+
+// Set records a concrete patch value.
+func (p WorkItemPatch) Set(key string, value any) {
+	p[key] = value
+}
+
+// Clear records an explicit JSON null clear.
+func (p WorkItemPatch) Clear(key string) {
+	p[key] = nil
 }
 
 // WorkItemStatePlan is a project workflow plan.

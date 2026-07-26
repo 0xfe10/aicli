@@ -103,6 +103,8 @@ func (c *Client) ListProjects(ctx context.Context, identifier string, pageIndex,
 
 func (c *Client) ResolveProject(ctx context.Context, projectIdentifier, projectID string) (Project, error) {
 	if projectID != "" {
+		// Exact ID path: still list/filter when identifier also provided for consistency checks,
+		// but ID is authoritative and must not fall back to another project.
 		return Project{
 			ID:         projectID,
 			Identifier: firstNonEmpty(projectIdentifier, c.cfg.ProjectIdentifier),
@@ -117,15 +119,30 @@ func (c *Client) ResolveProject(ctx context.Context, projectIdentifier, projectI
 	if err != nil {
 		return Project{}, err
 	}
+	var exact []Project
 	for _, item := range page.Values {
-		if item.Identifier == identifier {
-			return item, nil
+		if item.Identifier == identifier || item.ID == identifier {
+			exact = append(exact, item)
 		}
 	}
-	if len(page.Values) > 0 {
-		return page.Values[0], nil
+	if len(exact) == 1 {
+		return exact[0], nil
 	}
-	return Project{}, NewError(CodeNotFound, fmt.Sprintf("未找到 PingCode 项目：%s", identifier))
+	if len(exact) > 1 {
+		return Project{}, NewError(CodeAmbiguousName, fmt.Sprintf("项目标识存在歧义：%s", identifier))
+	}
+	candidates := make([]string, 0, len(page.Values))
+	for _, item := range page.Values {
+		candidates = append(candidates, firstNonEmpty(item.Identifier, item.Name, item.ID))
+		if len(candidates) >= 5 {
+			break
+		}
+	}
+	msg := fmt.Sprintf("未找到 PingCode 项目：%s", identifier)
+	if len(candidates) > 0 {
+		msg += "；相近候选项：" + strings.Join(candidates, ", ")
+	}
+	return Project{}, NewError(CodeNotFound, msg)
 }
 
 func (c *Client) GetCurrentUser(ctx context.Context) (User, error) {
@@ -254,7 +271,7 @@ func (c *Client) CreateWorkItem(ctx context.Context, payload WorkItemPayload) (W
 	return out, err
 }
 
-func (c *Client) UpdateWorkItem(ctx context.Context, workItemID string, payload WorkItemPayload) (WorkItem, error) {
+func (c *Client) UpdateWorkItem(ctx context.Context, workItemID string, payload WorkItemPatch) (WorkItem, error) {
 	path := fmt.Sprintf("%s/%s", pathWorkItems, url.PathEscape(workItemID))
 	var out WorkItem
 	err := c.request(ctx, http.MethodPatch, path, nil, payload, false, &out)

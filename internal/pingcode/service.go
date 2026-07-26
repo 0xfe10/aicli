@@ -1,7 +1,9 @@
 package pingcode
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -421,7 +423,30 @@ func (s *Service) UpdateWorkItemFields(ctx context.Context, in UpdateInput, appl
 	if err := AssertWritable(s.cfg); err != nil {
 		return nil, err
 	}
-	updated, err := s.client.UpdateWorkItem(ctx, item.ID, payload)
+
+	// Re-read immediately before write to close the concurrency window.
+	fresh, err := s.client.GetWorkItem(ctx, item.ID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := assertExpectedStatus(fresh, in.ExpectedCurrentStateName); err != nil {
+		return nil, err
+	}
+	payload, changes, err = s.buildFieldChanges(ctx, fresh, schema, in)
+	if err != nil {
+		return nil, err
+	}
+	out["target"] = summarizeWorkItem(fresh, s.cfg.BaseURL)
+	out["payload"] = payload
+	out["changes"] = changes
+	out["noChange"] = len(changes) == 0
+	out["expectedSatisfied"] = true
+	if len(changes) == 0 {
+		out["updated"] = summarizeWorkItem(fresh, s.cfg.BaseURL)
+		return out, nil
+	}
+
+	updated, err := s.client.UpdateWorkItem(ctx, fresh.ID, payload)
 	if err != nil {
 		return nil, err
 	}
@@ -509,7 +534,7 @@ func (s *Service) TransitionWorkItem(ctx context.Context, in TransitionInput, ap
 	if err := AssertWritable(s.cfg); err != nil {
 		return nil, err
 	}
-	updated, err := s.client.UpdateWorkItem(ctx, fresh.ID, WorkItemPayload{StateID: toStateID})
+	updated, err := s.client.UpdateWorkItem(ctx, fresh.ID, WorkItemPatch{"state_id": toStateID})
 	if err != nil {
 		return nil, err
 	}
@@ -901,53 +926,96 @@ func (s *Service) memberNamesToIDs(names []string, members []ProjectMember) ([]s
 	return out, nil
 }
 
-func (s *Service) buildFieldChanges(ctx context.Context, item WorkItem, schema SchemaContext, in UpdateInput) (WorkItemPayload, []FieldChange, error) {
-	payload := WorkItemPayload{}
+func (s *Service) buildFieldChanges(ctx context.Context, item WorkItem, schema SchemaContext, in UpdateInput) (WorkItemPatch, []FieldChange, error) {
+	payload := WorkItemPatch{}
 	changes := []FieldChange{}
 	if in.Title != nil && *in.Title != item.Title {
-		payload.Title = *in.Title
+		payload.Set("title", *in.Title)
 		changes = append(changes, FieldChange{Field: "title", From: item.Title, To: *in.Title})
 	}
 	if in.Description != nil && *in.Description != item.Description {
-		payload.Description = *in.Description
+		// Empty string is an explicit clear/set-empty; serialize as "" (not omitted).
+		payload.Set("description", *in.Description)
 		changes = append(changes, FieldChange{Field: "description", From: item.Description, To: *in.Description})
 	}
 	if in.PriorityName != nil {
+		if strings.TrimSpace(*in.PriorityName) == "" {
+			return nil, nil, NewError(CodeInvalidArgument, "priorityName 不能为空；清空优先级暂不支持")
+		}
 		p, err := s.resolveNamedPriority(*in.PriorityName, schema.Priorities, "优先级")
 		if err != nil {
-			return payload, nil, err
+			return nil, nil, err
 		}
 		if p.ID != refID(item.Priority) {
-			payload.PriorityID = p.ID
+			payload.Set("priority_id", p.ID)
 			changes = append(changes, FieldChange{Field: "priority", From: refName(item.Priority), To: p.Name})
 		}
 	}
 	if in.AssigneeName != nil {
-		m, err := s.resolveMember(*in.AssigneeName, schema.Members)
-		if err != nil {
-			return payload, nil, err
-		}
-		if m.ID != refID(item.Assignee) {
-			payload.AssigneeID = m.ID
-			to := *in.AssigneeName
-			changes = append(changes, FieldChange{Field: "assignee", From: firstNonEmpty(refDisplay(item.Assignee), refName(item.Assignee)), To: to})
+		if strings.TrimSpace(*in.AssigneeName) == "" {
+			if refID(item.Assignee) != "" {
+				payload.Clear("assignee_id")
+				changes = append(changes, FieldChange{Field: "assignee", From: firstNonEmpty(refDisplay(item.Assignee), refName(item.Assignee)), To: nil})
+			}
+		} else {
+			m, err := s.resolveMember(*in.AssigneeName, schema.Members)
+			if err != nil {
+				return nil, nil, err
+			}
+			if m.ID != refID(item.Assignee) {
+				payload.Set("assignee_id", m.ID)
+				changes = append(changes, FieldChange{Field: "assignee", From: firstNonEmpty(refDisplay(item.Assignee), refName(item.Assignee)), To: *in.AssigneeName})
+			}
 		}
 	}
 	if in.Parent != nil {
-		parentID, err := s.resolveParentID(ctx, *in.Parent, schema.Project.ID)
-		if err != nil {
-			return payload, nil, err
-		}
-		if parentID != refID(item.Parent) {
-			payload.ParentID = parentID
-			changes = append(changes, FieldChange{Field: "parent", From: refID(item.Parent), To: parentID})
+		if strings.TrimSpace(*in.Parent) == "" {
+			if refID(item.Parent) != "" {
+				payload.Clear("parent_id")
+				changes = append(changes, FieldChange{Field: "parent", From: refID(item.Parent), To: nil})
+			}
+		} else {
+			parentID, err := s.resolveParentID(ctx, *in.Parent, schema.Project.ID)
+			if err != nil {
+				return nil, nil, err
+			}
+			if parentID != refID(item.Parent) {
+				payload.Set("parent_id", parentID)
+				changes = append(changes, FieldChange{Field: "parent", From: refID(item.Parent), To: parentID})
+			}
 		}
 	}
 	if in.Properties != nil {
-		payload.Properties = in.Properties
-		changes = append(changes, FieldChange{Field: "properties", From: item.Properties, To: in.Properties})
+		// Explicit empty object must be sent; do not treat as omitempty.
+		same := mapsEqual(item.Properties, in.Properties)
+		if !same {
+			payload.Set("properties", in.Properties)
+			changes = append(changes, FieldChange{Field: "properties", From: item.Properties, To: in.Properties})
+		}
 	}
 	return payload, changes, nil
+}
+
+func mapsEqual(a, b map[string]any) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	if len(a) == 0 && len(b) == 0 {
+		// Treat nil and empty map as equal for no-change detection.
+		return true
+	}
+	for k, av := range a {
+		bv, ok := b[k]
+		if !ok {
+			return false
+		}
+		ab, _ := json.Marshal(av)
+		bb, _ := json.Marshal(bv)
+		if !bytes.Equal(ab, bb) {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Service) resolveLegalTransitions(ctx context.Context, schema SchemaContext, currentStateID, toStateID string) (map[string]any, error) {
