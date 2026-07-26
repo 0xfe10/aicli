@@ -56,8 +56,7 @@ API host cannot be overridden by CLI flags. Tokens are never accepted as argv.
 ## Build
 
 ```sh
-chmod +x scripts/build-pingcode.sh
-./scripts/build-pingcode.sh
+just build-pingcode
 ```
 
 Produces static Linux `amd64`/`arm64` binaries and SHA256 sidecars under `dist/`.

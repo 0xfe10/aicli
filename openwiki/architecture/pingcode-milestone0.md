@@ -24,4 +24,4 @@ keeps MCP-validated `/v1/project/...` paths, centralized in
 
 ## Static build gate
 
-Release builds use `CGO_ENABLED=0` via `scripts/build-pingcode.sh`.
+Release builds use `CGO_ENABLED=0` via the `Justfile` build recipes.
