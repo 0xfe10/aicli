@@ -12,7 +12,7 @@ func Services() []Service {
 		{
 			ID:      "pingcode",
 			Name:    "PingCode",
-			Status:  "planned",
+			Status:  "active",
 			Command: "pingcode",
 		},
 	}

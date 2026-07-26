@@ -1,14 +1,13 @@
 package restish
 
-// Runtime records the project boundary for Restish-backed service CLIs.
-//
-// The first Go monorepo cut does not download or embed Restish. A later release
-// task should decide how Restish binaries are fetched, verified, embedded, and
-// executed for each target platform.
+import "github.com/0xfe10/aicli/internal/restishrt"
+
+// Runtime records Restish embedding metadata for service CLIs.
 type Runtime struct {
 	Version string
 }
 
+// PlannedRuntime returns the pinned Restish version used by aicli.
 func PlannedRuntime() Runtime {
-	return Runtime{Version: "2.3.0"}
+	return Runtime{Version: restishrt.Version()}
 }

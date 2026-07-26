@@ -1,19 +1,23 @@
 commands:
   - name: pingcode version
     mode: read
-    description: Print planned PingCode CLI runtime metadata.
+    description: Print CLI, Go, Restish, and commit versions.
     output: json
   - name: pingcode config check
     mode: read
-    description: Validate local PingCode configuration.
+    description: Validate local PingCode configuration without revealing credentials.
     output: json
   - name: pingcode auth status
     mode: read
-    description: Report whether authentication is configured and usable.
+    description: Report authentication mode and redacted status.
     output: json
   - name: pingcode auth login
     mode: auth
-    description: Start or complete PingCode user authentication.
+    description: Start PingCode user OAuth and persist a random state.
+    output: json
+  - name: pingcode auth complete
+    mode: auth
+    description: Complete OAuth from a callback URL read on stdin.
     output: json
   - name: pingcode auth logout
     mode: auth
@@ -25,19 +29,19 @@ commands:
     output: json
   - name: pingcode project schema
     mode: read
-    description: Show project work item schema metadata.
+    description: Show project work item schema and available transitions.
     output: json
   - name: pingcode work-item get
     mode: read
-    description: Fetch a work item by identifier.
+    description: Fetch a work item by id or identifier.
     output: json
   - name: pingcode work-item search
     mode: read
-    description: Search work items.
+    description: Search work items across kinds with dedupe and pagination metadata.
     output: json
   - name: pingcode work-item mine
     mode: read
-    description: List work items assigned to the authenticated user.
+    description: List work items for the current user or default assignee.
     output: json
   - name: pingcode work-item create
     mode: write
@@ -65,16 +69,16 @@ commands:
     dry_run_default: true
     apply_flag: --apply
     output: json
+  - name: pingcode raw
+    mode: debug
+    description: Embedded Restish escape hatch for raw PingCode API debugging.
+    output: json
+deferred:
   - name: pingcode work-item triage
-    mode: write
-    description: Plan or apply a triage update.
-    dry_run_default: true
-    apply_flag: --apply
-    expected_state_guard: expected-current-state
-    output: json
+    reason: Evaluate after first release stabilizes.
   - name: pingcode work-item bulk-update
-    mode: write
-    description: Plan or apply multiple work item updates.
-    dry_run_default: true
-    apply_flag: --apply
-    output: json
+    reason: Evaluate after first release stabilizes.
+  - name: relations
+    reason: Deferred from first release.
+  - name: import
+    reason: Deferred from first release.

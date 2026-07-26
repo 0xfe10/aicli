@@ -15,19 +15,20 @@ knowledge for how service CLIs should behave.
 
 - [CLI platform](architecture/cli-platform.md) explains the repository layout and
   ownership boundaries.
-- [Service CLI contract](decisions/service-cli-contract.md) records the initial
-  command contract for AI-safe service CLIs.
+- [Service CLI contract](decisions/service-cli-contract.md) records the command
+  contract for AI-safe service CLIs.
+- [PingCode Milestone 0](architecture/pingcode-milestone0.md) records path and
+  Restish gating decisions.
 - `services/` contains service registrations and command manifests.
 - `cmd/` contains release command entrypoints.
-- `internal/` contains shared Go packages.
+- `internal/` contains shared and service Go packages.
 
 ## Local smoke test
-
-Run the current Go entrypoints:
 
 ```sh
 go run ./cmd/aicli services
 go run ./cmd/pingcode version
+go test ./...
 ```
 
 OpenWiki content is maintained in-repository. Do not add OpenWiki CI or scheduled
