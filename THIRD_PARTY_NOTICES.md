@@ -1,7 +1,23 @@
 # Third-party notices
 
-This file records licenses for third-party code embedded or linked into
-`pingcode` release binaries.
+This file records licenses for third-party code linked into `pingcode`
+and `aicli` release binaries.
+
+Evidence is maintained under `openwiki/compliance/`:
+
+- [`modules-linked.txt`](openwiki/compliance/modules-linked.txt) — `go list -deps` closure for `./cmd/pingcode`
+- [`license-inventory.md`](openwiki/compliance/license-inventory.md) — per-module license scan from module-cache LICENSE files
+- [`notices/`](openwiki/compliance/notices/) — copied NOTICE files for Apache-2.0 modules when present
+- [`govulncheck.txt`](openwiki/compliance/govulncheck.txt) — `govulncheck ./...` output
+- [`go-mod-verify.txt`](openwiki/compliance/go-mod-verify.txt) — `go mod verify` output
+
+## Summary
+
+- Direct dependency: Restish `v2.3.0` (MIT)
+- Linked transitive modules for `./cmd/pingcode`: see inventory (currently 54)
+- No GPLv3 detected in LICENSE scan of the linked closure
+- Apache-2.0 modules are present (for example `amazon-ion/ion-go`); include their NOTICE files from `openwiki/compliance/notices/` with release artifacts when shipping binaries
+- Vulnerability status is **incomplete for release**: `github.com/shamaton/msgpack/v3` GO-2026-4740 has no upstream fix and is reachable through Restish initialization
 
 ## Restish
 
@@ -32,6 +48,5 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-Additional Go module licenses used transitively by Restish are MIT/BSD/Apache-2.0
-compatible. Run `go list -m all` and inspect module licenses before redistribution
-if your compliance process requires a full inventory.
+Do not treat this file as a claim that all dependency risk is cleared. Recheck
+`govulncheck` and the license inventory before each release.
