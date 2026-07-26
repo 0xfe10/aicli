@@ -3,8 +3,9 @@ package pingcode
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
+
+	"github.com/0xfe10/aicli/internal/redact"
 )
 
 // Stable error codes required by the CLI contract.
@@ -90,21 +91,9 @@ func Classify(err error) *Error {
 	}
 }
 
-var (
-	secretKVPattern   = regexp.MustCompile(`(?i)("?(access_token|refresh_token|client_secret|code)"?\s*[:=]\s*"?)[^"&\s,}]+`)
-	bearerPattern     = regexp.MustCompile(`(?i)Bearer\s+[A-Za-z0-9._\-]+`)
-	querySecretPattern = regexp.MustCompile(`(?i)(access_token|refresh_token|client_secret|code)=[^&\s]+`)
-)
-
 // Redact removes tokens, secrets, authorization codes, and bearer headers.
 func Redact(text string) string {
-	if text == "" {
-		return text
-	}
-	out := secretKVPattern.ReplaceAllString(text, "${1}***")
-	out = bearerPattern.ReplaceAllString(out, "Bearer ***")
-	out = querySecretPattern.ReplaceAllString(out, "${1}=***")
-	return out
+	return redact.String(text)
 }
 
 // APIError is a PingCode HTTP failure with redacted serialization.
