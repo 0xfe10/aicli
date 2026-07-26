@@ -21,21 +21,35 @@ build-pingcode: _validate-version
     @just _build-pingcode linux arm64
 
 release-build: _validate-version
-    @just _build-archive aicli linux amd64
-    @just _build-archive aicli linux arm64
-    @just _build-archive aicli darwin amd64
-    @just _build-archive aicli darwin arm64
-    @just _build-archive aicli windows amd64
-    @just _build-archive aicli windows arm64
-    @just _build-archive pingcode linux amd64
-    @just _build-archive pingcode linux arm64
-    @just _build-archive pingcode darwin amd64
-    @just _build-archive pingcode darwin arm64
-    @just _build-archive pingcode windows amd64
-    @just _build-archive pingcode windows arm64
-    @cd "{{ out_dir }}" && sha256sum ./*_"{{ version }}"_*.tar.gz ./*_"{{ version }}"_*.zip > checksums.txt
+    @just build-archive aicli linux amd64
+    @just build-archive aicli linux arm64
+    @just build-archive aicli darwin amd64
+    @just build-archive aicli darwin arm64
+    @just build-archive aicli windows amd64
+    @just build-archive aicli windows arm64
+    @just build-archive pingcode linux amd64
+    @just build-archive pingcode linux arm64
+    @just build-archive pingcode darwin amd64
+    @just build-archive pingcode darwin arm64
+    @just build-archive pingcode windows amd64
+    @just build-archive pingcode windows arm64
+    @just release-checksums
     @echo "release artifacts in {{ out_dir }}"
     @ls -lh "{{ out_dir }}"
+
+build-archive command goos goarch: _validate-version
+    @just _build-archive "{{ command }}" "{{ goos }}" "{{ goarch }}"
+
+release-checksums: _validate-version
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{ out_dir }}"
+    archive_count="$(find . -maxdepth 1 -type f \( -name '*_{{ version }}_*.tar.gz' -o -name '*_{{ version }}_*.zip' \) | wc -l)"
+    if [[ "$archive_count" -ne 12 ]]; then
+      echo "expected 12 release archives, found ${archive_count}" >&2
+      exit 1
+    fi
+    sha256sum ./*_"{{ version }}"_*.tar.gz ./*_"{{ version }}"_*.zip > checksums.txt
 
 _validate-version:
     @if [[ ! "{{ version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then echo "VERSION must be a semantic version without the leading v: {{ version }}" >&2; exit 64; fi
