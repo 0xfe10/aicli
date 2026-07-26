@@ -28,3 +28,13 @@ raw REST calls here.
 PingCode is registered as an external implementation because the existing
 `0xfe10/pingcode-mcp` project already owns the API client, OAuth, token storage,
 dry-run behavior, status guards, and error redaction.
+
+## Restish experiments
+
+The umbrella CLI may provide thin experimental wrappers around Restish for quick
+API exploration. These wrappers call a local Restish profile and should stay
+read-only unless a service-specific safety layer is added.
+
+For PingCode, `aicli pingcode restish setup` registers a local Restish profile
+named `pingcode`. The first trial commands are project listing and work item
+search. They are not the final PingCode domain CLI contract.

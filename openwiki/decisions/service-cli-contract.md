@@ -53,3 +53,12 @@ truncated and how the caller can continue.
 
 Read retries should be bounded. Non-idempotent writes should not be retried
 blindly.
+
+## Restish-backed wrappers
+
+Restish-backed commands are allowed as experiments for read-only API discovery
+and smoke tests. They should be marked as experimental in service manifests.
+
+Credentials should be configured through Restish profiles or another local secret
+mechanism, not committed to the repository. Wrapper commands should avoid taking
+tokens or client secrets as command-line options.

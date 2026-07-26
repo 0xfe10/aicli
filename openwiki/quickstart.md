@@ -20,5 +20,17 @@ CLIs should behave.
 - `services/` contains service registrations and command manifests.
 - `packages/aicli/` contains the minimal umbrella CLI package.
 
+## PingCode Restish smoke test
+
+Install Restish with Linuxbrew, register the PingCode API base URL, configure
+auth in Restish, and run the first read-only wrappers:
+
+```sh
+brew install restish
+aicli pingcode restish setup --base-url https://api.pingcode.com
+aicli pingcode project list --page-size 10
+aicli pingcode work-item search --project-id <project-id> --page-size 10
+```
+
 OpenWiki content is maintained in-repository. Do not add OpenWiki CI or scheduled
 automation unless that is approved as a separate change.
