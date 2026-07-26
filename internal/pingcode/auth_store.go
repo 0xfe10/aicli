@@ -21,10 +21,10 @@ type StoredTokens struct {
 
 // AuthStore persists user tokens with 0600 permissions and atomic rename.
 type AuthStore struct {
-	path   string
-	mu     sync.Mutex
-	cache  *StoredTokens
-	loaded bool
+	path    string
+	mu      sync.Mutex
+	cache   *StoredTokens
+	loaded  bool
 	loadErr error
 }
 
@@ -280,6 +280,7 @@ func SetNowFunc(fn func() time.Time) {
 	}
 	nowFunc = fn
 }
+
 // SaveOAuthState atomically stores a pending OAuth state.
 func SaveOAuthState(path, state string) error {
 	payload := OAuthState{State: state, CreatedAt: nowFunc().UnixMilli()}

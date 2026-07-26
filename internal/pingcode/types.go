@@ -141,9 +141,9 @@ func (p WorkItemPatch) Clear(key string) {
 
 // WorkItemStatePlan is a project workflow plan.
 type WorkItemStatePlan struct {
-	ID          string `json:"id"`
-	Name        string `json:"name,omitempty"`
-	ProjectType string `json:"project_type,omitempty"`
+	ID           string `json:"id"`
+	Name         string `json:"name,omitempty"`
+	ProjectType  string `json:"project_type,omitempty"`
 	WorkItemType string `json:"work_item_type,omitempty"`
 }
 
@@ -157,20 +157,20 @@ type WorkItemStateFlow struct {
 
 // WorkItemListQuery carries list/search filters.
 type WorkItemListQuery struct {
-	Identifier             string
-	ProjectIDs             string
-	TypeIDs                string
-	StateIDs               string
-	AssigneeIDs            string
-	PriorityIDs            string
-	ParentIDs              string
-	Keywords               string
-	UpdatedBetween         string
-	IncludeDeleted         *bool
-	IncludeArchived        *bool
+	Identifier              string
+	ProjectIDs              string
+	TypeIDs                 string
+	StateIDs                string
+	AssigneeIDs             string
+	PriorityIDs             string
+	ParentIDs               string
+	Keywords                string
+	UpdatedBetween          string
+	IncludeDeleted          *bool
+	IncludeArchived         *bool
 	IncludePublicImageToken *bool
-	PageIndex              *int
-	PageSize               *int
+	PageIndex               *int
+	PageSize                *int
 }
 
 // TokenResponse is the /v1/auth/token payload.

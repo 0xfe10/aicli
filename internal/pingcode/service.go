@@ -77,12 +77,12 @@ func (s *Service) GetSchema(ctx context.Context, kind *WorkItemKind, projectIden
 		}
 	}
 	return map[string]any{
-		"project":         project,
-		"type":            typ,
-		"types":           typesPage.Values,
-		"states":          statesPage.Values,
-		"priorities":      prioritiesPage.Values,
-		"members":         membersPage.Values,
+		"project":          project,
+		"type":             typ,
+		"types":            typesPage.Values,
+		"states":           statesPage.Values,
+		"priorities":       prioritiesPage.Values,
+		"members":          membersPage.Values,
 		"stateTransitions": flows,
 	}, nil
 }
@@ -502,17 +502,17 @@ func (s *Service) TransitionWorkItem(ctx context.Context, in TransitionInput, ap
 	}
 	workflow, _ := s.resolveLegalTransitions(ctx, schema, refID(item.State), toStateID)
 	plan := map[string]any{
-		"target":            summarizeWorkItem(item, s.cfg.BaseURL),
-		"currentStatus":     refName(item.State),
-		"currentStateId":    refID(item.State),
-		"toStatus":          toStatus,
-		"toStateId":         toStateID,
-		"availableStates":   mapStates(schema.States),
-		"allowedTransitions": workflow["allowedTransitions"],
-		"transitionAllowed": workflow["transitionAllowed"],
+		"target":               summarizeWorkItem(item, s.cfg.BaseURL),
+		"currentStatus":        refName(item.State),
+		"currentStateId":       refID(item.State),
+		"toStatus":             toStatus,
+		"toStateId":            toStateID,
+		"availableStates":      mapStates(schema.States),
+		"allowedTransitions":   workflow["allowedTransitions"],
+		"transitionAllowed":    workflow["transitionAllowed"],
 		"expectedCurrentState": in.ExpectedCurrentStateName,
-		"willChange":        toStateID != refID(item.State),
-		"note":              workflow["note"],
+		"willChange":           toStateID != refID(item.State),
+		"note":                 workflow["note"],
 	}
 	out := map[string]any{"dryRun": !apply, "plan": plan}
 	if !apply {

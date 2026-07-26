@@ -41,10 +41,10 @@ func TestPostDoesNotRetryOn401(t *testing.T) {
 		ExpiresAt:    time.Now().Add(time.Hour).UnixMilli(),
 	})
 	client := pingcode.NewClient(pingcode.Config{
-		APIBaseURL: srv.URL,
-		AuthScheme: "Bearer",
-		TimeoutMS:  5000,
-		ClientID:   "cid",
+		APIBaseURL:   srv.URL,
+		AuthScheme:   "Bearer",
+		TimeoutMS:    5000,
+		ClientID:     "cid",
 		ClientSecret: "csecret",
 	}, store)
 	_, err := client.CreateWorkItem(context.Background(), pingcode.WorkItemPayload{

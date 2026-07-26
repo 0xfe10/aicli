@@ -38,11 +38,11 @@ const (
 
 // Client is the typed PingCode Open API HTTP client.
 type Client struct {
-	cfg    Config
-	store  *AuthStore
-	http   *http.Client
-	mu     sync.Mutex
-	cached string
+	cfg             Config
+	store           *AuthStore
+	http            *http.Client
+	mu              sync.Mutex
+	cached          string
 	cachedExpiresAt time.Time
 
 	// test hooks

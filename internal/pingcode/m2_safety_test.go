@@ -164,17 +164,17 @@ func TestUpdateClearDescriptionSendsEmptyString(t *testing.T) {
 		case r.URL.Path == "/v1/project/work_items" && r.Method == http.MethodGet:
 			_ = json.NewEncoder(w).Encode(page([]any{map[string]any{
 				"id": "wi1", "identifier": "DEMO-1", "title": "Bug", "description": "keep me",
-				"state": map[string]any{"id": "s1", "name": "新提交"},
-				"assignee": map[string]any{"id": "u1", "display_name": "Ada"},
-				"parent": map[string]any{"id": "parent1"},
+				"state":      map[string]any{"id": "s1", "name": "新提交"},
+				"assignee":   map[string]any{"id": "u1", "display_name": "Ada"},
+				"parent":     map[string]any{"id": "parent1"},
 				"properties": map[string]any{"a": 1},
 			}}))
 		case strings.HasPrefix(r.URL.Path, "/v1/project/work_items/") && r.Method == http.MethodGet:
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"id": "wi1", "identifier": "DEMO-1", "title": "Bug", "description": "keep me",
-				"state": map[string]any{"id": "s1", "name": "新提交"},
-				"assignee": map[string]any{"id": "u1", "display_name": "Ada"},
-				"parent": map[string]any{"id": "parent1"},
+				"state":      map[string]any{"id": "s1", "name": "新提交"},
+				"assignee":   map[string]any{"id": "u1", "display_name": "Ada"},
+				"parent":     map[string]any{"id": "parent1"},
 				"properties": map[string]any{"a": 1},
 			})
 		case r.Method == http.MethodPatch:
