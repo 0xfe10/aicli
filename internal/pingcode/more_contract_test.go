@@ -224,7 +224,11 @@ func TestAuthLoginAndComplete(t *testing.T) {
 		t.Fatalf("secrets leaked: %s", stdout.String())
 	}
 	store := pingcode.NewAuthStore(filepath.Join(dir, "auth.json"))
-	if store.Get().AccessToken != "user-access" {
-		t.Fatalf("token not saved: %#v", store.Get())
+	got, err := store.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AccessToken != "user-access" {
+		t.Fatalf("token not saved: %#v", got)
 	}
 }

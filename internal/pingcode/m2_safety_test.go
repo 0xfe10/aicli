@@ -97,10 +97,7 @@ func TestUpdateRegetsBeforePatch(t *testing.T) {
 		case r.URL.Path == "/v1/project/work_item_state_plans":
 			_ = json.NewEncoder(w).Encode(page([]any{}))
 		case r.URL.Path == "/v1/project/work_items" && r.Method == http.MethodGet:
-			_ = json.NewEncoder(w).Encode(page([]any{map[string]any{
-				"id": "wi1", "identifier": "DEMO-1", "title": "Bug",
-				"state": map[string]any{"id": "s1", "name": "处理中"},
-			}}))
+			_ = json.NewEncoder(w).Encode(page([]any{}))
 		case strings.HasPrefix(r.URL.Path, "/v1/project/work_items/") && r.Method == http.MethodGet:
 			n := gets.Add(1)
 			state := map[string]any{"id": "s1", "name": "处理中"}
@@ -131,10 +128,10 @@ func TestUpdateRegetsBeforePatch(t *testing.T) {
 	var stdout bytes.Buffer
 	result := pingcode.Execute(context.Background(), []string{"work-item", "update", "--input", "-", "--apply"}, pingcode.RuntimeDependencies{
 		Stdout: &stdout,
-		Stdin:  strings.NewReader(`{"kind":"bug","identifier":"DEMO-1","expectedCurrentState":"处理中","title":"new"}`),
+		Stdin:  strings.NewReader(`{"kind":"bug","workItemId":"wi1","expectedCurrentState":"处理中","title":"new"}`),
 	})
 	if result.ExitCode != cli.ExitConflict {
-		t.Fatalf("exit=%d out=%s", result.ExitCode, stdout.String())
+		t.Fatalf("exit=%d gets=%d patches=%d out=%s", result.ExitCode, gets.Load(), patches.Load(), stdout.String())
 	}
 	if patches.Load() != 0 {
 		t.Fatalf("PATCH must not fire after state drift, patches=%d", patches.Load())

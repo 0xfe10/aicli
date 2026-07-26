@@ -371,11 +371,17 @@ func (c *Client) request(ctx context.Context, method, path string, query url.Val
 			return WrapError(CodeUpstreamError, "读取 PingCode 响应失败", readErr)
 		}
 
-		if resp.StatusCode == http.StatusUnauthorized && !retried401 {
-			if ok, _ := c.reauthorizeAfter401(ctx); ok {
+		if resp.StatusCode == http.StatusUnauthorized && !retried401 && isRead {
+			if ok, reauthErr := c.reauthorizeAfter401(ctx); ok {
 				retried401 = true
 				continue
+			} else if reauthErr != nil {
+				return Classify(reauthErr)
 			}
+		}
+		if resp.StatusCode == http.StatusUnauthorized && !isRead {
+			msg := fmt.Sprintf("PingCode API 鉴权失败：%d（写请求不会自动重试，请检查目标状态后手动重试）", resp.StatusCode)
+			return Classify(&APIError{Message: msg, Status: resp.StatusCode, ResponseText: string(text)})
 		}
 		if isRead && resp.StatusCode == http.StatusTooManyRequests && rateRetries < maxReadRetriesOn429 {
 			rateRetries++
@@ -414,7 +420,11 @@ func (c *Client) request(ctx context.Context, method, path string, query url.Val
 
 func (c *Client) reauthorizeAfter401(ctx context.Context) (bool, error) {
 	if c.store != nil {
-		if stored := c.store.Get(); stored != nil && stored.RefreshToken != "" {
+		stored, err := c.store.Get()
+		if err != nil {
+			return false, err
+		}
+		if stored != nil && stored.RefreshToken != "" {
 			refreshed, err := c.RefreshUserToken(ctx, stored.RefreshToken)
 			if err != nil {
 				return false, err
@@ -486,7 +496,10 @@ func (c *Client) tryUserAuthorization(ctx context.Context) (string, error) {
 	if c.store == nil {
 		return "", nil
 	}
-	stored := c.store.Get()
+	stored, err := c.store.Get()
+	if err != nil {
+		return "", err
+	}
 	if stored == nil || stored.AccessToken == "" {
 		return "", nil
 	}

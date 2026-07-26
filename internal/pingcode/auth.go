@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"net/url"
 	"strings"
-	"time"
 )
 
 // AuthService orchestrates user OAuth login/status/logout.
@@ -82,6 +81,7 @@ func (a *AuthService) CompleteFromCallbackURL(ctx context.Context, callbackURL s
 		return nil, err
 	}
 	if saved.State != state {
+		_ = ClearOAuthState(a.cfg.AuthStatePath)
 		return nil, NewError(CodeAuthRequired, "OAuth state 不匹配；请重新运行 pingcode auth login")
 	}
 	token, err := a.client.ExchangeAuthorizationCode(ctx, code)
@@ -92,8 +92,8 @@ func (a *AuthService) CompleteFromCallbackURL(ctx context.Context, callbackURL s
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
 		TokenType:    firstNonEmpty(token.TokenType, "Bearer"),
-		ExpiresAt:    NormalizeExpiresAt(token.ExpiresIn, time.Now()),
-		SavedAt:      time.Now().UnixMilli(),
+		ExpiresAt:    NormalizeExpiresAt(token.ExpiresIn, nowFunc()),
+		SavedAt:      nowFunc().UnixMilli(),
 	}); err != nil {
 		return nil, err
 	}
@@ -107,10 +107,14 @@ func (a *AuthService) CompleteFromCallbackURL(ctx context.Context, callbackURL s
 
 // Status returns a redacted auth status.
 func (a *AuthService) Status(ctx context.Context) (AuthStatus, error) {
-	if stored := a.store.Get(); stored != nil && stored.AccessToken != "" {
+	stored, err := a.store.Get()
+	if err != nil {
+		return AuthStatus{}, err
+	}
+	if stored != nil && stored.AccessToken != "" {
 		var expires *int64
 		if stored.ExpiresAt > 0 {
-			secs := (stored.ExpiresAt - time.Now().UnixMilli()) / 1000
+			secs := (stored.ExpiresAt - nowFunc().UnixMilli()) / 1000
 			if secs < 0 {
 				secs = 0
 			}

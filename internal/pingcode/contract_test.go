@@ -79,7 +79,10 @@ func TestAuthStorePermissionsAndAtomicWrite(t *testing.T) {
 	if dirInfo.Mode().Perm()&0o077 != 0 {
 		t.Fatalf("dir mode too open: %04o", dirInfo.Mode().Perm())
 	}
-	got := store.Get()
+	got, err := store.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got == nil || got.AccessToken != "secret-token" {
 		t.Fatalf("roundtrip failed: %#v", got)
 	}
@@ -208,8 +211,12 @@ func TestRefreshBeforeExpiryAnd401RetryOnce(t *testing.T) {
 	if authTokenCalls.Load() < 1 {
 		t.Fatal("expected refresh")
 	}
-	if store.Get().AccessToken != "refreshed-token" {
-		t.Fatalf("store not updated: %#v", store.Get())
+	got, err := store.Get()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AccessToken != "refreshed-token" {
+		t.Fatalf("store not updated: %#v", got)
 	}
 }
 

@@ -94,9 +94,12 @@ func AssertWritable(cfg Config) error {
 
 // CheckConfig returns a redacted configuration diagnostic report.
 func CheckConfig(cfg Config) map[string]any {
+	tokenInspect := InspectTokenFile(cfg.AuthTokenPath)
 	authSources := []string{}
-	if _, err := os.Stat(cfg.AuthTokenPath); err == nil {
-		authSources = append(authSources, "user-token-file")
+	if ok, _ := tokenInspect["ok"].(bool); ok {
+		if status, _ := tokenInspect["status"].(string); status == "ok" {
+			authSources = append(authSources, "user-token-file")
+		}
 	}
 	if cfg.AccessToken != "" {
 		authSources = append(authSources, "env-token")
@@ -110,17 +113,16 @@ func CheckConfig(cfg Config) map[string]any {
 
 	tokenDir := filepath.Dir(cfg.AuthTokenPath)
 	dirMode := ""
-	fileMode := ""
 	if info, err := os.Stat(tokenDir); err == nil {
 		dirMode = fmt.Sprintf("%04o", info.Mode().Perm())
-	}
-	if info, err := os.Stat(cfg.AuthTokenPath); err == nil {
-		fileMode = fmt.Sprintf("%04o", info.Mode().Perm())
 	}
 
 	issues := []string{}
 	if cfg.BaseURL == "" || strings.Contains(cfg.BaseURL, "your-domain") {
 		issues = append(issues, "PINGCODE_BASE_URL 未配置为真实租户地址")
+	}
+	if status, _ := tokenInspect["status"].(string); status != "" && status != "missing" && status != "ok" {
+		issues = append(issues, "token 文件不可用: "+status)
 	}
 	if len(authSources) == 1 && authSources[0] == "missing" {
 		issues = append(issues, "缺少可用认证来源")
@@ -129,6 +131,7 @@ func CheckConfig(cfg Config) map[string]any {
 		issues = append(issues, "未设置默认项目 PINGCODE_PROJECT_IDENTIFIER/PINGCODE_PROJECT_ID")
 	}
 
+	fileMode, _ := tokenInspect["mode"].(string)
 	return map[string]any{
 		"tenantURL":           cfg.BaseURL,
 		"apiURL":              cfg.APIBaseURL,
@@ -136,6 +139,7 @@ func CheckConfig(cfg Config) map[string]any {
 		"authTokenPath":       cfg.AuthTokenPath,
 		"authTokenDirMode":    dirMode,
 		"authTokenFileMode":   fileMode,
+		"authTokenFile":       tokenInspect,
 		"projectIdentifier":   cfg.ProjectIdentifier,
 		"projectIDSet":        cfg.ProjectID != "",
 		"defaultAssigneeName": cfg.DefaultAssigneeName != "",

@@ -2,8 +2,10 @@ package pingcode
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -23,6 +25,7 @@ type AuthStore struct {
 	mu     sync.Mutex
 	cache  *StoredTokens
 	loaded bool
+	loadErr error
 }
 
 // NewAuthStore creates a token store for path.
@@ -35,35 +38,37 @@ func (s *AuthStore) Path() string {
 	return s.path
 }
 
-// Get returns cached or on-disk tokens. Missing/invalid files return nil.
-func (s *AuthStore) Get() *StoredTokens {
+// Get returns cached or on-disk tokens.
+// Missing file => (nil, nil) meaning not logged in.
+// Insecure, wrong type, symlink, or invalid JSON => error.
+func (s *AuthStore) Get() (*StoredTokens, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if !s.loaded {
 		s.loaded = true
-		data, err := os.ReadFile(s.path)
+		tokens, err := readTokenFile(s.path)
 		if err != nil {
 			s.cache = nil
-			return nil
+			s.loadErr = err
+			return nil, err
 		}
-		var parsed StoredTokens
-		if err := json.Unmarshal(data, &parsed); err != nil || parsed.AccessToken == "" {
-			s.cache = nil
-			return nil
-		}
-		s.cache = &parsed
+		s.cache = tokens
+		s.loadErr = nil
+	}
+	if s.loadErr != nil {
+		return nil, s.loadErr
 	}
 	if s.cache == nil {
-		return nil
+		return nil, nil
 	}
 	cp := *s.cache
-	return &cp
+	return &cp, nil
 }
 
-// HasToken reports whether a user access token is present.
+// HasToken reports whether a usable user access token is present.
 func (s *AuthStore) HasToken() bool {
-	t := s.Get()
-	return t != nil && t.AccessToken != ""
+	t, err := s.Get()
+	return err == nil && t != nil && t.AccessToken != ""
 }
 
 // Save atomically writes tokens with directory 0700 and file 0600.
@@ -118,13 +123,17 @@ func (s *AuthStore) Save(tokens StoredTokens) (*StoredTokens, error) {
 	cp := tokens
 	s.cache = &cp
 	s.loaded = true
+	s.loadErr = nil
 	out := tokens
 	return &out, nil
 }
 
 // Update merges partial token fields and saves.
 func (s *AuthStore) Update(partial StoredTokens) (*StoredTokens, error) {
-	current := s.Get()
+	current, err := s.Get()
+	if err != nil {
+		return nil, err
+	}
 	merged := StoredTokens{
 		AccessToken:  partial.AccessToken,
 		RefreshToken: partial.RefreshToken,
@@ -158,10 +167,97 @@ func (s *AuthStore) Clear() error {
 	defer s.mu.Unlock()
 	s.cache = nil
 	s.loaded = true
+	s.loadErr = nil
 	if err := os.Remove(s.path); err != nil && !os.IsNotExist(err) {
 		return WrapError(CodeInternalError, "无法删除本地用户 Token", err)
 	}
 	return nil
+}
+
+// InspectTokenFile returns a redacted diagnostic for config check.
+func InspectTokenFile(path string) map[string]any {
+	out := map[string]any{
+		"path":   path,
+		"exists": false,
+		"ok":     false,
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			out["status"] = "missing"
+			out["ok"] = true // missing means not logged in, not a config corruption
+			return out
+		}
+		out["status"] = "error"
+		out["error"] = err.Error()
+		return out
+	}
+	out["exists"] = true
+	out["mode"] = fmt.Sprintf("%04o", info.Mode().Perm())
+	if info.Mode()&os.ModeSymlink != 0 {
+		out["status"] = "symlink_rejected"
+		return out
+	}
+	if !info.Mode().IsRegular() {
+		out["status"] = "not_regular_file"
+		return out
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o177 != 0 {
+		out["status"] = "permissions_too_open"
+		return out
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		out["status"] = "unreadable"
+		out["error"] = err.Error()
+		return out
+	}
+	var parsed StoredTokens
+	if err := json.Unmarshal(data, &parsed); err != nil || parsed.AccessToken == "" {
+		out["status"] = "invalid_json"
+		return out
+	}
+	out["status"] = "ok"
+	out["ok"] = true
+	out["hasRefreshToken"] = parsed.RefreshToken != ""
+	return out
+}
+
+func readTokenFile(path string) (*StoredTokens, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, WrapError(CodeInternalError, "无法读取 token 文件", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return nil, NewError(CodeConfigMissing, "拒绝使用符号链接作为 token 文件")
+	}
+	if !info.Mode().IsRegular() {
+		return nil, NewError(CodeConfigMissing, "token 路径必须是普通文件")
+	}
+	if runtime.GOOS != "windows" {
+		perm := info.Mode().Perm()
+		if perm&0o177 != 0 {
+			return nil, NewError(CodeConfigMissing, fmt.Sprintf("token 文件权限过宽（%04o），要求不超过 0600", perm))
+		}
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, WrapError(CodeInternalError, "无法读取 token 文件", err)
+	}
+	var parsed StoredTokens
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return nil, NewError(CodeConfigMissing, "token 文件 JSON 无效")
+	}
+	if parsed.AccessToken == "" {
+		return nil, NewError(CodeConfigMissing, "token 文件缺少 accessToken")
+	}
+	if parsed.TokenType == "" {
+		parsed.TokenType = "Bearer"
+	}
+	return &parsed, nil
 }
 
 // OAuthState is the pending authorization state.
@@ -170,9 +266,23 @@ type OAuthState struct {
 	CreatedAt int64  `json:"createdAt"`
 }
 
+// OAuthStateTTL is the maximum age of a pending OAuth state.
+const OAuthStateTTL = 10 * time.Minute
+
+// nowFunc is injectable for OAuth TTL tests.
+var nowFunc = time.Now
+
+// SetNowFunc overrides the clock used for OAuth state TTL. Tests should restore with time.Now.
+func SetNowFunc(fn func() time.Time) {
+	if fn == nil {
+		nowFunc = time.Now
+		return
+	}
+	nowFunc = fn
+}
 // SaveOAuthState atomically stores a pending OAuth state.
 func SaveOAuthState(path, state string) error {
-	payload := OAuthState{State: state, CreatedAt: time.Now().UnixMilli()}
+	payload := OAuthState{State: state, CreatedAt: nowFunc().UnixMilli()}
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return WrapError(CodeInternalError, "无法创建 OAuth state 目录", err)
@@ -207,7 +317,7 @@ func SaveOAuthState(path, state string) error {
 	return os.Chmod(path, 0o600)
 }
 
-// LoadOAuthState reads pending OAuth state.
+// LoadOAuthState reads pending OAuth state and enforces TTL.
 func LoadOAuthState(path string) (*OAuthState, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -217,8 +327,14 @@ func LoadOAuthState(path string) (*OAuthState, error) {
 		return nil, WrapError(CodeInternalError, "无法读取 OAuth state", err)
 	}
 	var state OAuthState
-	if err := json.Unmarshal(data, &state); err != nil || state.State == "" {
+	if err := json.Unmarshal(data, &state); err != nil || state.State == "" || state.CreatedAt <= 0 {
+		_ = ClearOAuthState(path)
 		return nil, NewError(CodeAuthRequired, "OAuth state 无效；请重新运行 pingcode auth login")
+	}
+	age := nowFunc().Sub(time.UnixMilli(state.CreatedAt))
+	if age < 0 || age > OAuthStateTTL {
+		_ = ClearOAuthState(path)
+		return nil, NewError(CodeAuthRequired, "OAuth state 已过期；请重新运行 pingcode auth login")
 	}
 	return &state, nil
 }
