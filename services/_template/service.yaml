@@ -2,10 +2,10 @@ id: example
 name: Example Service
 status: template
 implementation:
-  type: external
-  repository: https://github.com/example/example-cli
-  package: example-cli
+  type: go-command
+  package: ./cmd/example
   command: example
+  transport: planned-embedded-restish
 contract:
   stdout: single-json-document
   stderr: diagnostics-only

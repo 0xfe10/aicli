@@ -1,15 +1,7 @@
 commands:
-  - name: aicli pingcode restish setup
-    mode: config
-    description: Register the PingCode API base URL as the local Restish profile named pingcode.
-    output: json
-  - name: aicli pingcode project list
+  - name: pingcode version
     mode: read
-    description: Experimental Restish-backed project list wrapper.
-    output: json
-  - name: aicli pingcode work-item search
-    mode: read
-    description: Experimental Restish-backed work item search wrapper.
+    description: Print planned PingCode CLI runtime metadata.
     output: json
   - name: pingcode config check
     mode: read

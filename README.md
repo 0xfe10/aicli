@@ -1,40 +1,34 @@
 # aicli
 
-`aicli` is a command-line interface for AI-oriented services.
+`aicli` is a Go monorepo for AI-oriented service CLIs.
 
 The project is intended to provide CLI tools for working with different AI
 service providers and workflows from a single place.
 
 ## Structure
 
-- `packages/aicli/` contains the umbrella CLI package.
+- `cmd/` contains release command entrypoints.
+- `internal/` contains shared Go packages for service CLIs.
 - `services/` contains service CLI registrations and command manifests.
 - `openwiki/` contains repository knowledge, architecture notes, and decisions.
 
 Service implementations may live in this repository or in external projects when
 they already own mature API clients, authentication, and business safety logic.
 
-## PingCode Restish experiment
+## Local commands
 
-Install Restish with Linuxbrew:
-
-```sh
-brew install restish
-```
-
-Register the PingCode API base URL as a Restish profile:
+List registered service CLIs:
 
 ```sh
-aicli pingcode restish setup --base-url https://api.pingcode.com
+go run ./cmd/aicli services
 ```
 
-Configure PingCode auth in Restish, then try the first read-only commands:
+Inspect the PingCode placeholder command:
 
 ```sh
-aicli pingcode project list --page-size 10
-aicli pingcode work-item search --project-id <project-id> --page-size 10
+go run ./cmd/pingcode version
 ```
 
-These commands are experimental wrappers around Restish. They are useful for API
-exploration and smoke tests, not a replacement for a safer domain CLI that
-understands PingCode workflow rules.
+Future service CLIs are expected to use embedded Restish-backed transport while
+keeping service-specific authentication, token refresh, redaction, dry-run, and
+workflow safety logic in Go.

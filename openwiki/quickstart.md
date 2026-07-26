@@ -7,9 +7,9 @@ tags: [aicli, openwiki, cli, ai-services]
 
 # aicli OpenWiki quickstart
 
-`aicli` is the workspace for AI-oriented service CLIs. It keeps a small umbrella
-CLI, a machine-readable service registry, and project knowledge for how service
-CLIs should behave.
+`aicli` is a Go monorepo for AI-oriented service CLIs. It keeps command
+entrypoints, shared Go packages, a machine-readable service registry, and project
+knowledge for how service CLIs should behave.
 
 ## Start here
 
@@ -18,18 +18,16 @@ CLIs should behave.
 - [Service CLI contract](decisions/service-cli-contract.md) records the initial
   command contract for AI-safe service CLIs.
 - `services/` contains service registrations and command manifests.
-- `packages/aicli/` contains the minimal umbrella CLI package.
+- `cmd/` contains release command entrypoints.
+- `internal/` contains shared Go packages.
 
-## PingCode Restish smoke test
+## Local smoke test
 
-Install Restish with Linuxbrew, register the PingCode API base URL, configure
-auth in Restish, and run the first read-only wrappers:
+Run the current Go entrypoints:
 
 ```sh
-brew install restish
-aicli pingcode restish setup --base-url https://api.pingcode.com
-aicli pingcode project list --page-size 10
-aicli pingcode work-item search --project-id <project-id> --page-size 10
+go run ./cmd/aicli services
+go run ./cmd/pingcode version
 ```
 
 OpenWiki content is maintained in-repository. Do not add OpenWiki CI or scheduled

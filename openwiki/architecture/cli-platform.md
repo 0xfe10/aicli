@@ -7,34 +7,33 @@ tags: [aicli, architecture, cli, services]
 
 # CLI platform
 
-`aicli` is a registry and distribution workspace for command-line tools that let
-AI agents use external services through narrow, stable command surfaces.
+`aicli` is a Go monorepo and distribution workspace for command-line tools that
+let AI agents use external services through narrow, stable command surfaces.
 
 ## Repository layout
 
 - `services/` is the service registry. Each service owns a `service.yaml` file and
   a `commands.yaml` file.
-- `packages/aicli/` is the umbrella CLI package. It can discover or route to
-  registered service CLIs, but it should not absorb every service implementation.
+- `cmd/` contains release command entrypoints such as `aicli` and `pingcode`.
+- `internal/` contains shared Go packages for JSON output, service registry, and
+  future Restish runtime integration.
 - `openwiki/` is the durable project knowledge layer.
 
 ## Implementation boundary
 
-Service CLIs can be implemented inside this repository or maintained externally.
+Service CLIs are Go commands. They should expose service-specific business
+commands while sharing common output, redaction, registry, and Restish runtime
+support through `internal/`.
+
 When a service already has mature client, authentication, retry, safety, and
-business logic, the CLI should reuse that implementation instead of reimplementing
-raw REST calls here.
+business logic, that behavior should be ported intentionally instead of replaced
+with raw HTTP calls.
 
-PingCode is registered as an external implementation because the existing
-`0xfe10/pingcode-mcp` project already owns the API client, OAuth, token storage,
-dry-run behavior, status guards, and error redaction.
+## Restish direction
 
-## Restish experiments
+Future service CLIs are expected to use Restish as an embedded or bundled
+transport layer rather than requiring users to install Restish separately.
 
-The umbrella CLI may provide thin experimental wrappers around Restish for quick
-API exploration. These wrappers call a local Restish profile and should stay
-read-only unless a service-specific safety layer is added.
-
-For PingCode, `aicli pingcode restish setup` registers a local Restish profile
-named `pingcode`. The first trial commands are project listing and work item
-search. They are not the final PingCode domain CLI contract.
+The first Go cut only records the runtime boundary. The release design still
+needs to decide how Restish binaries are fetched, verified, embedded, extracted,
+and executed for each supported OS and architecture.
