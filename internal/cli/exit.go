@@ -20,7 +20,7 @@ func ExitCodeFor(code string) int {
 	switch code {
 	case "":
 		return ExitOK
-	case "UNKNOWN_COMMAND", "INVALID_INPUT":
+	case "UNKNOWN_COMMAND", "INVALID_INPUT", "INVALID_ARGUMENT":
 		return ExitUsage
 	case "CONFIG_MISSING":
 		return ExitConfig

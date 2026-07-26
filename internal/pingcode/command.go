@@ -1,6 +1,7 @@
 package pingcode
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -311,7 +312,7 @@ func runWrite(ctx context.Context, action string, args []string, svc *Service, d
 	}
 	raw, err := io.ReadAll(io.LimitReader(deps.Stdin, 4<<20))
 	if err != nil {
-		return writeErr(deps.Stdout, WrapError(CodeInvalidInput, "无法读取 stdin", err))
+		return writeErr(deps.Stdout, WrapError(CodeInvalidArgument, "无法读取 stdin", err))
 	}
 	if err := rejectWriteControlFields(raw); err != nil {
 		return writeErr(deps.Stdout, err)
@@ -320,26 +321,26 @@ func runWrite(ctx context.Context, action string, args []string, svc *Service, d
 	switch action {
 	case "create":
 		var in CreateInput
-		if err := json.Unmarshal(raw, &in); err != nil {
-			return writeErr(deps.Stdout, NewError(CodeInvalidInput, "stdin JSON 无效: "+err.Error()))
+		if err := DecodeStrictJSON(raw, &in); err != nil {
+			return writeErr(deps.Stdout, err)
 		}
 		data, err = svc.CreateWorkItem(ctx, in, *apply)
 	case "update":
 		var in UpdateInput
-		if err := json.Unmarshal(raw, &in); err != nil {
-			return writeErr(deps.Stdout, NewError(CodeInvalidInput, "stdin JSON 无效: "+err.Error()))
+		if err := DecodeStrictJSON(raw, &in); err != nil {
+			return writeErr(deps.Stdout, err)
 		}
 		data, err = svc.UpdateWorkItemFields(ctx, in, *apply)
 	case "transition":
 		var in TransitionInput
-		if err := json.Unmarshal(raw, &in); err != nil {
-			return writeErr(deps.Stdout, NewError(CodeInvalidInput, "stdin JSON 无效: "+err.Error()))
+		if err := DecodeStrictJSON(raw, &in); err != nil {
+			return writeErr(deps.Stdout, err)
 		}
 		data, err = svc.TransitionWorkItem(ctx, in, *apply)
 	case "comment":
 		var in CommentInput
-		if err := json.Unmarshal(raw, &in); err != nil {
-			return writeErr(deps.Stdout, NewError(CodeInvalidInput, "stdin JSON 无效: "+err.Error()))
+		if err := DecodeStrictJSON(raw, &in); err != nil {
+			return writeErr(deps.Stdout, err)
 		}
 		data, err = svc.AddComment(ctx, in, *apply)
 	}
@@ -353,15 +354,16 @@ func runWrite(ctx context.Context, action string, args []string, svc *Service, d
 }
 
 func rejectWriteControlFields(raw []byte) error {
-	var probe map[string]any
-	if err := json.Unmarshal(raw, &probe); err != nil {
-		return NewError(CodeInvalidInput, "stdin JSON 无效")
+	// Loose probe only for clearer apply/dryRun messages; typed decode enforces unknown fields.
+	var probe map[string]json.RawMessage
+	if err := json.Unmarshal(bytes.TrimSpace(raw), &probe); err != nil {
+		return nil
 	}
 	if _, ok := probe["apply"]; ok {
-		return NewError(CodeInvalidInput, "写入 JSON 不得包含 apply；请使用顶层 --apply")
+		return NewError(CodeInvalidArgument, "写入 JSON 不得包含 apply；请使用顶层 --apply")
 	}
 	if _, ok := probe["dryRun"]; ok {
-		return NewError(CodeInvalidInput, "写入 JSON 不得包含 dryRun；请使用顶层 --apply")
+		return NewError(CodeInvalidArgument, "写入 JSON 不得包含 dryRun；请使用顶层 --apply")
 	}
 	return nil
 }

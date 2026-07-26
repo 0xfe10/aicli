@@ -10,6 +10,7 @@ import (
 // Stable error codes required by the CLI contract.
 const (
 	CodeInvalidInput          = "INVALID_INPUT"
+	CodeInvalidArgument       = "INVALID_ARGUMENT"
 	CodeConfigMissing         = "CONFIG_MISSING"
 	CodeAuthRequired          = "AUTH_REQUIRED"
 	CodeAuthExpired           = "AUTH_EXPIRED"

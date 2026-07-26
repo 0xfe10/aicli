@@ -10,6 +10,7 @@ func TestExitCodeFor(t *testing.T) {
 	cases := map[string]int{
 		"":                        cli.ExitOK,
 		"INVALID_INPUT":           cli.ExitUsage,
+		"INVALID_ARGUMENT":        cli.ExitUsage,
 		"CONFIG_MISSING":          cli.ExitConfig,
 		"AUTH_REQUIRED":           cli.ExitAuth,
 		"AUTH_EXPIRED":            cli.ExitAuth,

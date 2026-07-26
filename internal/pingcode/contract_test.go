@@ -434,6 +434,9 @@ func TestRejectApplyInJSONBody(t *testing.T) {
 	if result.ExitCode != cli.ExitUsage {
 		t.Fatalf("exit=%d out=%s", result.ExitCode, stdout.String())
 	}
+	if !strings.Contains(stdout.String(), "INVALID_ARGUMENT") {
+		t.Fatalf("expected INVALID_ARGUMENT: %s", stdout.String())
+	}
 }
 
 func TestAmbiguousName(t *testing.T) {
