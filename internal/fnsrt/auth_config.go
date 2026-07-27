@@ -7,21 +7,30 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/0xfe10/aicli/internal/authflow"
 	toml "github.com/pelletier/go-toml/v2"
 )
 
 const (
+	AuthModeToken = "token"
+
 	configFileName = "config.toml"
 	dirPerm        = 0o700
 	filePerm       = 0o600
 	groupOtherBits = 0o077
 )
 
+// AuthConfig is the persisted [auth] section.
+type AuthConfig struct {
+	Mode        string `toml:"mode"`
+	AccessToken string `toml:"access_token,omitempty"`
+}
+
 // FileConfig is the persisted FNS configuration file.
 type FileConfig struct {
-	BaseURL     string `toml:"base_url,omitempty"`
-	Client      string `toml:"client,omitempty"`
-	AccessToken string `toml:"access_token,omitempty"`
+	BaseURL string      `toml:"base_url,omitempty"`
+	Client  string      `toml:"client,omitempty"`
+	Auth    *AuthConfig `toml:"auth,omitempty"`
 }
 
 // ConfigDir returns $XDG_CONFIG_HOME/aicli/fns or ~/.config/aicli/fns.
@@ -69,18 +78,25 @@ func LoadFileConfig(path string) (FileConfig, error) {
 	}
 	file.BaseURL = strings.TrimSpace(file.BaseURL)
 	file.Client = strings.TrimSpace(file.Client)
-	file.AccessToken = strings.TrimSpace(file.AccessToken)
+	if file.Auth != nil {
+		if err := validateAuthConfig(file.Auth); err != nil {
+			return FileConfig{}, err
+		}
+	}
 	return file, nil
 }
 
-// SaveAccessToken stores access_token while preserving other config fields.
-func SaveAccessToken(path, token string) error {
-	token = strings.TrimSpace(token)
-	if token == "" {
-		return fmt.Errorf("access token is required")
-	}
+// SaveLogin atomically writes base_url and [auth] into config.toml.
+func SaveLogin(path, baseURL string, auth *AuthConfig) error {
 	if path == "" {
 		return fmt.Errorf("FNS config path is unavailable")
+	}
+	normalized, err := authflow.NormalizeBaseURL(baseURL)
+	if err != nil {
+		return err
+	}
+	if err := validateAuthConfig(auth); err != nil {
+		return err
 	}
 	if err := ensureSecureDir(filepath.Dir(path)); err != nil {
 		return err
@@ -89,18 +105,16 @@ func SaveAccessToken(path, token string) error {
 	if err != nil {
 		return err
 	}
-	if file.BaseURL == "" {
-		file.BaseURL = DefaultBaseURL
-	}
+	file.BaseURL = normalized
 	if file.Client == "" {
 		file.Client = DefaultClient
 	}
-	file.AccessToken = token
+	file.Auth = auth
 	return writeConfigFileAtomic(path, file)
 }
 
-// ClearAccessToken removes access_token while preserving other config fields.
-func ClearAccessToken(path string) error {
+// ClearAuthConfig removes the [auth] section while preserving base_url and client.
+func ClearAuthConfig(path string) error {
 	if path == "" {
 		return fmt.Errorf("FNS config path is unavailable")
 	}
@@ -118,8 +132,26 @@ func ClearAccessToken(path string) error {
 	if err != nil {
 		return err
 	}
-	file.AccessToken = ""
+	file.Auth = nil
 	return writeConfigFileAtomic(path, file)
+}
+
+func validateAuthConfig(auth *AuthConfig) error {
+	if auth == nil {
+		return fmt.Errorf("auth config is required")
+	}
+	mode := strings.TrimSpace(auth.Mode)
+	switch mode {
+	case AuthModeToken:
+		if strings.TrimSpace(auth.AccessToken) == "" {
+			return fmt.Errorf("token auth requires access_token")
+		}
+	default:
+		return fmt.Errorf("unsupported auth mode %q: expected %q", auth.Mode, AuthModeToken)
+	}
+	auth.Mode = mode
+	auth.AccessToken = strings.TrimSpace(auth.AccessToken)
+	return nil
 }
 
 func writeConfigFileAtomic(path string, file FileConfig) error {

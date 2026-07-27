@@ -1,38 +1,17 @@
 package fnsrt
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"os"
 	"strings"
 
-	"golang.org/x/term"
+	"github.com/0xfe10/aicli/internal/authflow"
 )
 
 // AuthIO controls interactive prompts for auth commands.
-type AuthIO struct {
-	Stdin      io.Reader
-	Stdout     io.Writer
-	Stderr     io.Writer
-	ReadSecret func(prompt string) (string, error)
-}
+type AuthIO = authflow.IO
 
 func defaultAuthIO() AuthIO {
-	return AuthIO{
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-		ReadSecret: func(prompt string) (string, error) {
-			fmt.Fprint(os.Stderr, prompt)
-			secret, err := term.ReadPassword(int(os.Stdin.Fd()))
-			fmt.Fprintln(os.Stderr)
-			if err != nil {
-				return "", err
-			}
-			return string(secret), nil
-		},
-	}
+	return authflow.DefaultIO()
 }
 
 // MaybeRunAuth handles `fns auth ...` before Restish sees argv.
@@ -46,15 +25,7 @@ func MaybeRunAuth(args []string) (handled bool, err error) {
 
 // RunAuth executes login/status/logout subcommands.
 func RunAuth(args []string, authIO AuthIO) error {
-	if authIO.Stdout == nil {
-		authIO.Stdout = os.Stdout
-	}
-	if authIO.Stderr == nil {
-		authIO.Stderr = os.Stderr
-	}
-	if authIO.Stdin == nil {
-		authIO.Stdin = os.Stdin
-	}
+	authIO = authIO.Normalize()
 	if len(args) == 0 {
 		return fmt.Errorf("usage: fns auth login|status|logout")
 	}
@@ -80,15 +51,15 @@ func runAuthLogin(args []string, authIO AuthIO) error {
 			}
 			mode = args[i+1]
 			i++
-		case "--access-token":
-			return fmt.Errorf("%s is not supported; enter secrets interactively to avoid shell history exposure", args[i])
+		case "--access-token", "--base-url":
+			return fmt.Errorf("%s is not supported; enter values interactively to avoid shell history exposure", args[i])
 		default:
 			return fmt.Errorf("unknown login flag %q", args[i])
 		}
 	}
 	mode = strings.TrimSpace(mode)
 	switch mode {
-	case "token":
+	case AuthModeToken:
 		return loginToken(authIO)
 	case "":
 		return fmt.Errorf("usage: fns auth login --mode token")
@@ -98,45 +69,56 @@ func runAuthLogin(args []string, authIO AuthIO) error {
 }
 
 func loginToken(authIO AuthIO) error {
-	token, err := readSecret(authIO, "Access Token: ")
+	baseURL, err := authflow.PromptBaseURL(authIO)
+	if err != nil {
+		return err
+	}
+	token, err := authflow.PromptSecret(authIO, "Access Token: ")
 	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(token) == "" {
 		return fmt.Errorf("Access Token is required")
 	}
-	if err := SaveAccessToken(ConfigPath(), token); err != nil {
+	if err := SaveLogin(ConfigPath(), baseURL, &AuthConfig{
+		Mode:        AuthModeToken,
+		AccessToken: strings.TrimSpace(token),
+	}); err != nil {
 		return err
 	}
 	fmt.Fprintln(authIO.Stdout, "Credentials saved.")
 	return nil
 }
 
-type authStatusReport struct {
-	Configured bool   `json:"configured"`
-	HasToken   bool   `json:"hasToken"`
-	Source     string `json:"source,omitempty"`
-	ConfigPath string `json:"configPath,omitempty"`
-}
-
 func runAuthStatus(authIO AuthIO) error {
 	path := ConfigPath()
-	report := authStatusReport{ConfigPath: path}
+	report := authflow.StatusReport{ConfigPath: path}
+
+	baseURL, baseSource, err := ResolveBaseURL(path)
+	if err != nil {
+		return err
+	}
+	// Omit compile-time placeholder so status does not look configured.
+	if baseSource != authflow.SourceDefault {
+		report.BaseURL = baseURL
+		report.BaseURLSource = baseSource
+	}
+
 	creds, err := resolveCredentials(path)
 	if err != nil {
 		if strings.Contains(err.Error(), "not configured") {
-			return writeJSON(authIO.Stdout, report)
+			return authflow.WriteJSON(authIO.Stdout, report)
 		}
 		return err
 	}
 	report.Configured = true
-	report.HasToken = creds.AccessToken != ""
-	report.Source = creds.Source
-	return writeJSON(authIO.Stdout, report)
+	report.Mode = AuthModeToken
+	report.CredentialSource = creds.Source
+	return authflow.WriteJSON(authIO.Stdout, report)
 }
 
 func runAuthLogout(authIO AuthIO) error {
-	if err := ClearAccessToken(ConfigPath()); err != nil {
+	if err := ClearAuthConfig(ConfigPath()); err != nil {
 		return err
 	}
 	fmt.Fprintln(authIO.Stdout, "Credentials removed.")
@@ -144,17 +126,4 @@ func runAuthLogout(authIO AuthIO) error {
 		fmt.Fprintln(authIO.Stderr, "warning: FNS_ACCESS_TOKEN is still set; this process will continue to use environment authorization")
 	}
 	return nil
-}
-
-func readSecret(authIO AuthIO, prompt string) (string, error) {
-	if authIO.ReadSecret != nil {
-		return authIO.ReadSecret(prompt)
-	}
-	return "", fmt.Errorf("secret prompt is unavailable")
-}
-
-func writeJSON(w io.Writer, value any) error {
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(value)
 }

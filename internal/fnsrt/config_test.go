@@ -1,7 +1,6 @@
 package fnsrt
 
 import (
-	"os"
 	"testing"
 )
 
@@ -20,6 +19,9 @@ func TestLoadConfigDefaultsAndOverrides(t *testing.T) {
 	if cfg.BaseURL != "https://fns.example.com" {
 		t.Fatalf("BaseURL = %q, want https://fns.example.com", cfg.BaseURL)
 	}
+	if !IsPlaceholderBaseURL(cfg.BaseURL) {
+		t.Fatal("default base URL should be treated as placeholder")
+	}
 	wantSpec := "https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/" + PinnedSpecCommit + "/docs/swagger.yaml"
 	if cfg.SpecURL != wantSpec || DefaultSpecURL != wantSpec {
 		t.Fatalf("SpecURL = %q DefaultSpecURL = %q, want %q", cfg.SpecURL, DefaultSpecURL, wantSpec)
@@ -34,13 +36,7 @@ func TestLoadConfigDefaultsAndOverrides(t *testing.T) {
 		t.Fatalf("Client = %q", cfg.Client)
 	}
 
-	if err := SaveAccessToken(ConfigPath(), "file-token"); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(ConfigPath(), []byte("base_url = \"https://fns.example.test\"\nclient = \"file-client\"\naccess_token = \"file-token\"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(ConfigPath(), 0o600); err != nil {
+	if err := SaveLogin(ConfigPath(), "https://fns.example.test", &AuthConfig{Mode: AuthModeToken, AccessToken: "file-token"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -51,7 +47,7 @@ func TestLoadConfigDefaultsAndOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.BaseURL != "https://fns.example.test" || cfg.Client != "file-client" {
+	if cfg.BaseURL != "https://fns.example.test" || cfg.Client != DefaultClient {
 		t.Fatalf("file config not applied: %#v", cfg)
 	}
 	if cfg.SpecURL != wantSpec {
@@ -78,5 +74,26 @@ func TestLoadConfigDefaultsAndOverrides(t *testing.T) {
 	creds, err = ResolveCredentials()
 	if err != nil || creds.AccessToken != "env-token" || creds.Source != CredentialSourceEnvironment {
 		t.Fatalf("env token creds=%#v err=%v", creds, err)
+	}
+}
+
+func TestPartialEnvOverrideKeepsConfigBaseURL(t *testing.T) {
+	xdg := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	t.Setenv("FNS_BASE_URL", "")
+	t.Setenv("FNS_ACCESS_TOKEN", "env-only-token")
+	if err := SaveLogin(ConfigPath(), "https://file.fns.test", &AuthConfig{Mode: AuthModeToken, AccessToken: "file-token"}); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig("1.2.3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BaseURL != "https://file.fns.test" {
+		t.Fatalf("BaseURL = %q", cfg.BaseURL)
+	}
+	creds, err := ResolveCredentials()
+	if err != nil || creds.AccessToken != "env-only-token" || creds.Source != CredentialSourceEnvironment {
+		t.Fatalf("creds=%#v err=%v", creds, err)
 	}
 }

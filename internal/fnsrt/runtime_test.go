@@ -222,6 +222,36 @@ func TestEmbeddedRestishDoesNotRetryWriteAfterUnauthorized(t *testing.T) {
 	}
 }
 
+func TestEmbeddedRestishBlocksPlaceholderBaseURL(t *testing.T) {
+	spec, err := os.ReadFile(filepath.Join("testdata", "swagger.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	mux.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(spec)
+	})
+	mux.HandleFunc("/", func(http.ResponseWriter, *http.Request) {
+		t.Error("placeholder Base URL must not receive API traffic")
+	})
+
+	stateDir := t.TempDir()
+	t.Setenv("RSH_CONFIG_DIR", stateDir+"/config")
+	t.Setenv("RSH_CACHE_DIR", stateDir+"/cache")
+	t.Setenv("FNS_ACCESS_TOKEN", "token")
+	t.Setenv("FNS_WRITE_MODE", "readonly")
+
+	cli := NewCLI(Config{BaseURL: DefaultBaseURL, SpecURL: server.URL + "/openapi.yaml", Client: "aicli", Version: "test"}, "test", "")
+	var stdout, stderr bytes.Buffer
+	cli.Stdout, cli.Stderr = &stdout, &stderr
+	err = cli.Run([]string{"fns", "note", "get-api-note", "Notes/test.md", "genesis", "-o", "json"})
+	if err == nil || !strings.Contains(err.Error(), "FNS Base URL is not configured") {
+		t.Fatalf("error = %v stdout=%s stderr=%s", err, stdout.String(), stderr.String())
+	}
+}
+
 func runTestCLI(t *testing.T, cfg Config, stdin string, args []string) string {
 	t.Helper()
 	cli := NewCLI(cfg, cfg.Version, "")

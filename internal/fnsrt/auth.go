@@ -18,6 +18,9 @@ func (*BearerAuth) Parameters() []restishauth.Param { return nil }
 func (*BearerAuth) SupportsForce() {}
 
 func (*BearerAuth) Authenticate(_ context.Context, req *http.Request, ac restishauth.AuthContext) error {
+	if err := RejectPlaceholderBaseURL(ac.BaseURL); err != nil {
+		return err
+	}
 	if err := enforceWriteMode(req.Method, os.Getenv("FNS_WRITE_MODE")); err != nil {
 		return err
 	}

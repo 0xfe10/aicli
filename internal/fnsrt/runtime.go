@@ -32,7 +32,13 @@ type Config struct {
 
 // LoadConfig resolves base URL, spec URL, and client identity.
 // Environment variables override values from config.toml.
+// DefaultBaseURL is a compile-time placeholder kept so --help works; API
+// requests must call RejectPlaceholderBaseURL before network I/O.
 func LoadConfig(version string) (Config, error) {
+	baseURL, _, err := ResolveBaseURL(ConfigPath())
+	if err != nil {
+		return Config{}, err
+	}
 	var file FileConfig
 	if path := ConfigPath(); path != "" {
 		loaded, err := LoadFileConfig(path)
@@ -42,7 +48,7 @@ func LoadConfig(version string) (Config, error) {
 		file = loaded
 	}
 	cfg := Config{
-		BaseURL: firstNonEmpty(os.Getenv("FNS_BASE_URL"), file.BaseURL, DefaultBaseURL),
+		BaseURL: baseURL,
 		SpecURL: firstNonEmpty(os.Getenv("FNS_SPEC_URL"), DefaultSpecURL),
 		Client:  firstNonEmpty(os.Getenv("FNS_CLIENT"), file.Client, DefaultClient),
 		Version: strings.TrimSpace(version),
