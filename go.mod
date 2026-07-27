@@ -4,7 +4,9 @@ go 1.25.3
 
 require (
 	github.com/pb33f/libopenapi v0.35.0
+	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/rest-sh/restish/v2 v2.3.0
+	golang.org/x/term v0.43.0
 )
 
 require (
@@ -59,6 +61,5 @@ require (
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/text v0.39.0 // indirect
 )

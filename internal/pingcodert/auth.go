@@ -32,22 +32,21 @@ func (*ClientCredentialsAuth) Authenticate(ctx context.Context, req *http.Reques
 	if ac.Force && isWriteMethod(req.Method) {
 		return fmt.Errorf("PingCode %s request returned unauthorized; automatic retry is disabled for writes because the outcome is uncertain", strings.ToUpper(req.Method))
 	}
-	if token := strings.TrimSpace(os.Getenv("PINGCODE_ACCESS_TOKEN")); token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-		return nil
-	}
 
-	clientID := strings.TrimSpace(os.Getenv("PINGCODE_CLIENT_ID"))
-	clientSecret := strings.TrimSpace(os.Getenv("PINGCODE_CLIENT_SECRET"))
-	if clientID == "" || clientSecret == "" {
-		return fmt.Errorf("PingCode authentication requires PINGCODE_ACCESS_TOKEN or PINGCODE_CLIENT_ID and PINGCODE_CLIENT_SECRET")
+	creds, err := ResolveCredentials()
+	if err != nil {
+		return err
+	}
+	if creds.Mode == AuthModeToken {
+		req.Header.Set("Authorization", "Bearer "+creds.AccessToken)
+		return nil
 	}
 
 	baseURL := strings.TrimRight(envOr("PINGCODE_API_BASE_URL", ac.BaseURL), "/")
 	if baseURL == "" {
 		baseURL = DefaultAPIBaseURL
 	}
-	cacheKey := clientCredentialsCacheKey(ac.CacheKey, baseURL, clientID)
+	cacheKey := clientCredentialsCacheKey(ac.CacheKey, baseURL, creds.ClientID)
 	if !ac.Force && ac.TokenStore != nil {
 		cached, err := ac.TokenStore.Get(cacheKey)
 		if err != nil {
@@ -59,7 +58,7 @@ func (*ClientCredentialsAuth) Authenticate(ctx context.Context, req *http.Reques
 		}
 	}
 
-	token, err := fetchClientCredentialsToken(ctx, ac.HTTPClient, baseURL, clientID, clientSecret)
+	token, err := fetchClientCredentialsToken(ctx, ac.HTTPClient, baseURL, creds.ClientID, creds.ClientSecret)
 	if err != nil {
 		return err
 	}
@@ -78,7 +77,7 @@ func clientCredentialsCacheKey(baseKey, baseURL, clientID string) string {
 	}
 	baseURLSum := sha256.Sum256([]byte(strings.TrimRight(baseURL, "/")))
 	clientIDSum := sha256.Sum256([]byte(strings.TrimSpace(clientID)))
-	return fmt.Sprintf("%s:base_url:%x:client_id:%x", baseKey, baseURLSum[:8], clientIDSum[:8])
+	return fmt.Sprintf("%s:cred:client:base_url:%x:client_id:%x", baseKey, baseURLSum[:8], clientIDSum[:8])
 }
 
 func fetchClientCredentialsToken(ctx context.Context, client *http.Client, baseURL, clientID, clientSecret string) (restishauth.CachedToken, error) {

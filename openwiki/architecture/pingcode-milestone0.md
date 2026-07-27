@@ -26,16 +26,24 @@ The PingCode adapter contains only:
 3. token-cache and forced-refresh integration with Restish.
 4. branded command name, defaults, and local state paths.
 5. an HTTP-method write gate controlled by `PINGCODE_WRITE_MODE`.
+6. local authorization control-plane commands (`auth login|status|logout`) that
+   persist credentials under `$XDG_CONFIG_HOME/aicli/pingcode/config.toml`.
 
 It does not contain a handwritten work-item client, domain service, OAuth browser
 flow, dry-run planner, MCP oracle, or manually curated aliases.
 
 ## Authentication
 
-Callers provide either:
+Callers provide credentials through either:
 
-- `PINGCODE_ACCESS_TOKEN`, or
-- `PINGCODE_CLIENT_ID` and `PINGCODE_CLIENT_SECRET`.
+1. `pingcode auth login --mode client` or `--mode token` (interactive; stored locally), or
+2. environment variables for CI / temporary override:
+   - `PINGCODE_ACCESS_TOKEN`, or
+   - `PINGCODE_CLIENT_ID` and `PINGCODE_CLIENT_SECRET` (both required together).
+
+Complete environment credentials always override `config.toml` for the current
+process and never rewrite the file. Incomplete client environment pairs are
+rejected. Secrets are not accepted on argv.
 
 For client credentials, the handler requests
 `GET /v1/auth/token?grant_type=client_credentials&...`, stores the resulting token
@@ -43,6 +51,8 @@ through Restish's token store, and forces one refresh after an unauthorized
 response for read requests. Writes are never automatically replayed after an
 unauthorized response because their remote outcome may be uncertain. Token
 endpoint response bodies and transport URLs are not included in errors.
+Login and logout clear cached client-credentials tokens so a rotated secret cannot
+reuse a stale access token.
 
 The generated API keeps user-token-only operations visible because they are part
 of the official surface. Client credentials cannot authorize those operations;

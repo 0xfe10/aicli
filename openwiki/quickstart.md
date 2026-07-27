@@ -23,8 +23,17 @@ tags: [aicli, openwiki, cli, ai-services, restish]
 ```sh
 go run ./cmd/aicli services
 go run ./cmd/pingcode --help
+go run ./cmd/pingcode auth status
 just verify
 just pingcode-spec-check
+```
+
+Authorize once with interactive login (no secrets on argv), then call generated
+commands without exporting credentials:
+
+```sh
+go run ./cmd/pingcode auth login --mode client
+go run ./cmd/pingcode pjm get-projects -o json
 ```
 
 OpenWiki content is maintained in-repository. Do not add OpenWiki CI or scheduled

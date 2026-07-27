@@ -16,10 +16,25 @@ install only the `pingcode` binary; a separate Restish installation is not neede
 
 ## PingCode
 
-Set either a fixed access token or client credentials:
+Save credentials once (interactive; secrets are not accepted on argv):
 
 ```sh
-export PINGCODE_CLIENT_ID='...'
+pingcode auth login --mode client   # Client ID + Client Secret
+pingcode auth login --mode token    # existing access token
+pingcode auth status
+pingcode auth logout
+```
+
+Credentials are stored at `$XDG_CONFIG_HOME/aicli/pingcode/config.toml`
+(default `~/.config/aicli/pingcode/config.toml`) with directory mode `0700` and
+file mode `0600`.
+
+Environment variables still override local config for CI and temporary use
+(without modifying the file):
+
+```sh
+export PINGCODE_ACCESS_TOKEN='...'                    # token mode
+export PINGCODE_CLIENT_ID='...'                       # client mode (both required)
 export PINGCODE_CLIENT_SECRET='...'
 ```
 
@@ -41,8 +56,8 @@ export PINGCODE_WRITE_MODE=destructive  # also allow DELETE
 
 Configuration:
 
-- `PINGCODE_ACCESS_TOKEN`
-- `PINGCODE_CLIENT_ID` / `PINGCODE_CLIENT_SECRET`
+- Local auth: `pingcode auth login|status|logout`
+- `PINGCODE_ACCESS_TOKEN` or `PINGCODE_CLIENT_ID` / `PINGCODE_CLIENT_SECRET` (override)
 - `PINGCODE_WRITE_MODE`: `readonly` (default), `write`, or `destructive`
 - `PINGCODE_API_BASE_URL`: defaults to `https://open.pingcode.com`
 - `PINGCODE_SPEC_URL`: defaults to `https://open.pingcode.com/api_data.json`

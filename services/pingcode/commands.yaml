@@ -9,7 +9,14 @@ surface:
     - records with unsupported HTTP methods
 support_commands:
   namespace: pingcode cli
+  auth:
+    - auth login --mode client
+    - auth login --mode token
+    - auth status
+    - auth logout
 examples:
+  - name: pingcode auth login --mode client
+    mode: setup
   - name: pingcode pjm get-projects
     mode: read
   - name: pingcode pjm get-work-items-by-work-item-id

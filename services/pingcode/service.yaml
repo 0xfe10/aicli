@@ -14,6 +14,13 @@ authentication:
     - access-token
     - client-credentials
   default: client-credentials
+  local_commands:
+    - auth login --mode client
+    - auth login --mode token
+    - auth status
+    - auth logout
+  config_path: $XDG_CONFIG_HOME/aicli/pingcode/config.toml
+  environment_override: true
 safety:
   write_mode_default: readonly
   write_modes:
@@ -23,7 +30,8 @@ safety:
 notes:
   - Restish generates the operation commands and executes API requests.
   - The local adapter converts PingCode's vendor API description to OpenAPI 3.1.
-  - OAuth and handwritten semantic command aliases are intentionally not included.
+  - Local auth stores client or token credentials in config.toml; OAuth is not included.
+  - Secrets are entered interactively; argv flags for secrets are rejected.
 openwiki:
   overview: openwiki/architecture/cli-platform.md
   contract: openwiki/decisions/service-cli-contract.md

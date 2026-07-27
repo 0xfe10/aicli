@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -157,6 +158,129 @@ func TestEmbeddedRestishDoesNotRetryWriteAfterUnauthorized(t *testing.T) {
 	}
 	if got := calls.Load(); got != 1 {
 		t.Fatalf("write requests = %d, want 1", got)
+	}
+}
+
+func TestEmbeddedRestishUsesConfigFileClientCredentials(t *testing.T) {
+	var tokenCalls atomic.Int32
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	mux.HandleFunc("/api_data.json", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `[{"type":"GET","url":"/v1/pjm/projects","group":"项目","name":"获取项目列表","permission":[{"name":"企业令牌"}]}]`)
+	})
+	mux.HandleFunc("/v1/auth/token", func(w http.ResponseWriter, r *http.Request) {
+		tokenCalls.Add(1)
+		if r.URL.Query().Get("client_id") != "file-client" || r.URL.Query().Get("client_secret") != "file-secret" {
+			t.Errorf("unexpected token query: %s", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"access_token":"file-token","token_type":"Bearer","expires_in":3600}`)
+	})
+	mux.HandleFunc("/v1/pjm/projects", func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer file-token" {
+			t.Errorf("Authorization = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"ok":true}`)
+	})
+
+	xdg := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	t.Setenv("RSH_CONFIG_DIR", filepath.Join(xdg, "aicli", "pingcode"))
+	t.Setenv("RSH_CACHE_DIR", filepath.Join(xdg, "cache"))
+	t.Setenv("PINGCODE_ACCESS_TOKEN", "")
+	t.Setenv("PINGCODE_CLIENT_ID", "")
+	t.Setenv("PINGCODE_CLIENT_SECRET", "")
+	if err := SaveAuthConfig(ConfigPath(), &AuthConfig{
+		Mode: AuthModeClient, ClientID: "file-client", ClientSecret: "file-secret",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	out := runTestCLI(t, Config{APIBaseURL: server.URL, SpecURL: server.URL + "/api_data.json"}, "", []string{
+		"pingcode", "pjm", "get-projects", "-o", "json",
+	})
+	if !strings.Contains(out, `"ok": true`) {
+		t.Fatalf("output = %s", out)
+	}
+	if tokenCalls.Load() != 1 {
+		t.Fatalf("token calls = %d", tokenCalls.Load())
+	}
+}
+
+func TestEmbeddedRestishEnvOverridesConfigFile(t *testing.T) {
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	mux.HandleFunc("/api_data.json", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `[{"type":"GET","url":"/v1/pjm/projects","group":"项目","name":"list","permission":[{"name":"企业令牌"}]}]`)
+	})
+	mux.HandleFunc("/v1/auth/token", func(http.ResponseWriter, *http.Request) {
+		t.Error("token endpoint should not be called for access-token override")
+	})
+	mux.HandleFunc("/v1/pjm/projects", func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer env-override" {
+			t.Errorf("Authorization = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"source":"env"}`)
+	})
+
+	xdg := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	t.Setenv("RSH_CONFIG_DIR", filepath.Join(xdg, "aicli", "pingcode"))
+	t.Setenv("RSH_CACHE_DIR", filepath.Join(xdg, "cache"))
+	if err := SaveAuthConfig(ConfigPath(), &AuthConfig{
+		Mode: AuthModeClient, ClientID: "file-client", ClientSecret: "file-secret",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PINGCODE_ACCESS_TOKEN", "env-override")
+
+	out := runTestCLI(t, Config{APIBaseURL: server.URL, SpecURL: server.URL + "/api_data.json"}, "", []string{
+		"pingcode", "pjm", "get-projects", "-o", "json",
+	})
+	if !strings.Contains(out, `"source": "env"`) {
+		t.Fatalf("output = %s", out)
+	}
+	auth, err := LoadAuthConfig(ConfigPath())
+	if err != nil || auth.ClientID != "file-client" {
+		t.Fatalf("config mutated: %#v err=%v", auth, err)
+	}
+}
+
+func TestEmbeddedRestishUsesConfigFileAccessToken(t *testing.T) {
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	mux.HandleFunc("/api_data.json", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `[{"type":"GET","url":"/v1/pjm/projects","group":"项目","name":"list","permission":[{"name":"企业令牌"}]}]`)
+	})
+	mux.HandleFunc("/v1/pjm/projects", func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer file-access-token" {
+			t.Errorf("Authorization = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"source":"file-token"}`)
+	})
+
+	xdg := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	t.Setenv("RSH_CONFIG_DIR", filepath.Join(xdg, "aicli", "pingcode"))
+	t.Setenv("RSH_CACHE_DIR", filepath.Join(xdg, "cache"))
+	t.Setenv("PINGCODE_ACCESS_TOKEN", "")
+	t.Setenv("PINGCODE_CLIENT_ID", "")
+	t.Setenv("PINGCODE_CLIENT_SECRET", "")
+	if err := SaveAuthConfig(ConfigPath(), &AuthConfig{Mode: AuthModeToken, AccessToken: "file-access-token"}); err != nil {
+		t.Fatal(err)
+	}
+
+	out := runTestCLI(t, Config{APIBaseURL: server.URL, SpecURL: server.URL + "/api_data.json"}, "", []string{
+		"pingcode", "pjm", "get-projects", "-o", "json",
+	})
+	if !strings.Contains(out, `"source": "file-token"`) {
+		t.Fatalf("output = %s", out)
 	}
 }
 

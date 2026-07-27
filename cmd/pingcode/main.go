@@ -14,6 +14,14 @@ var (
 )
 
 func main() {
+	if handled, err := pingcodert.MaybeRunAuth(os.Args); handled {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	cfg, err := pingcodert.LoadConfig()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
