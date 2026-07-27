@@ -1,11 +1,17 @@
 # Linked module license inventory
 
-Generated for `./cmd/pingcode` dependency closure on release commands.
+Generated for the union of release binary dependency closures:
 
-- Module count: 54
+- `./cmd/aicli`
+- `./cmd/pingcode`
+- `./cmd/fns`
+
+Evidence source: `just compliance-check` → [`modules-linked.txt`](modules-linked.txt).
+
+- Module count (union, excluding the main module): 60
 - Unknown/unreadable: 0
 - GPL detected: 0
-- Method: `go list -deps` + LICENSE file scan in module cache.
+- Method: `go list -deps -json` + LICENSE file scan in module cache.
 
 | Module | Version | License | License file | NOTICE required |
 |---|---|---|---|---|
@@ -29,6 +35,9 @@ Generated for `./cmd/pingcode` dependency closure on release commands.
 | `github.com/danielgtaylor/shorthand/v2` | `v2.4.0` | MIT | LICENSE | no |
 | `github.com/dlclark/regexp2` | `v1.11.5` | MIT | LICENSE | no |
 | `github.com/fxamacker/cbor/v2` | `v2.9.1` | MIT | LICENSE | no |
+| `github.com/getkin/kin-openapi` | `v0.145.0` | MIT | LICENSE | no |
+| `github.com/go-openapi/jsonpointer` | `v0.22.5` | Apache-2.0 | LICENSE | no (no NOTICE file in module) |
+| `github.com/go-openapi/swag/jsonname` | `v0.25.5` | Apache-2.0 | LICENSE | no (no NOTICE file in module) |
 | `github.com/google/shlex` | `v0.0.0-20191202100458-e7afc7fbc510` | Apache-2.0 | COPYING | yes |
 | `github.com/gorilla/css` | `v1.0.1` | BSD-3-Clause | LICENSE | no |
 | `github.com/hexops/gotextdiff` | `v1.0.3` | BSD-3-Clause | LICENSE | no |
@@ -40,6 +49,8 @@ Generated for `./cmd/pingcode` dependency closure on release commands.
 | `github.com/microcosm-cc/bluemonday` | `v1.0.27` | BSD-3-Clause | LICENSE.md | no |
 | `github.com/muesli/reflow` | `v0.3.0` | MIT | LICENSE | no |
 | `github.com/muesli/termenv` | `v0.16.0` | MIT | LICENSE | no |
+| `github.com/oasdiff/yaml` | `v0.1.1` | MIT | LICENSE | no |
+| `github.com/oasdiff/yaml3` | `v0.0.14` | MIT | LICENSE | no |
 | `github.com/pb33f/jsonpath` | `v0.8.2` | Apache-2.0 | LICENSE | yes |
 | `github.com/pb33f/libopenapi` | `v0.35.0` | MIT | LICENSE | no |
 | `github.com/pb33f/ordered-map/v2` | `v2.3.1` | Apache-2.0 | LICENSE | yes |
@@ -61,8 +72,22 @@ Generated for `./cmd/pingcode` dependency closure on release commands.
 | `golang.org/x/sys` | `v0.45.0` | BSD-3-Clause | LICENSE | no |
 | `golang.org/x/term` | `v0.43.0` | BSD-3-Clause | LICENSE | no |
 | `golang.org/x/text` | `v0.39.0` | BSD-3-Clause | LICENSE | no |
+| `gopkg.in/yaml.v3` | `v3.0.1` | MIT | LICENSE | no |
 | `go.yaml.in/yaml/v3` | `v3.0.4` | MIT | LICENSE | no |
 | `go.yaml.in/yaml/v4` | `v4.0.0-rc.4` | Apache-2.0 | LICENSE | yes |
+
+## New for `fns` / Swagger conversion
+
+These modules were promoted into the linked closure by the FNS Swagger 2 converter:
+
+| Module | Version | License | Notes |
+|---|---|---|---|
+| `github.com/getkin/kin-openapi` | `v0.145.0` | MIT | Direct dependency for `openapi2conv` |
+| `github.com/go-openapi/jsonpointer` | `v0.22.5` | Apache-2.0 | Transitive via kin-openapi; no NOTICE file shipped |
+| `github.com/go-openapi/swag/jsonname` | `v0.25.5` | Apache-2.0 | Transitive via kin-openapi; no NOTICE file shipped |
+| `github.com/oasdiff/yaml` | `v0.1.1` | MIT | Transitive via kin-openapi |
+| `github.com/oasdiff/yaml3` | `v0.0.14` | MIT | Transitive via kin-openapi |
+| `gopkg.in/yaml.v3` | `v3.0.1` | MIT | Direct dependency for YAML Swagger/OpenAPI decode |
 
 ## Unknown / needs human review
 
@@ -78,10 +103,11 @@ See [`govulncheck.txt`](govulncheck.txt).
 
 - Cleared by dependency updates: `github.com/yuin/goldmark` GO-2026-5320 and
   `golang.org/x/net` GO-2026-5026.
-- Open: `github.com/shamaton/msgpack/v3` GO-2026-4740 and GO-2026-4513
-  (both `Fixed in: N/A`; reachable through the embedded Restish runtime).
-- Release decision still requires the repository owner to accept the upstream
-  `msgpack` denial-of-service residual or wait for a fixed Restish dependency graph.
+- Pre-existing residual (not introduced by FNS): `github.com/shamaton/msgpack/v3`
+  GO-2026-4740 and GO-2026-4513 (`Fixed in: N/A`; reachable through the embedded
+  Restish runtime used by `pingcode` and `fns`).
+- No new vulnerabilities were introduced by the FNS / kin-openapi dependency set
+  in this scan.
 
 ## go mod verify
 

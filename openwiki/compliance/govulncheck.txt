@@ -1,7 +1,3 @@
-Command: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
-Observed: 2026-07-27 UTC
-Exit status: 3
-
 === Symbol Results ===
 
 Vulnerability #1: GO-2026-4740
@@ -10,10 +6,58 @@ Vulnerability #1: GO-2026-4740
   Module: github.com/shamaton/msgpack/v3
     Found in: github.com/shamaton/msgpack/v3@v3.1.2
     Fixed in: N/A
-    Representative reachable traces:
-      #1: cmd/pingcode/main.go:23:19: pingcode.main calls cli.CLI.Run, which eventually calls msgpack.Marshal
-      #2: cmd/pingcode/main.go:23:19: pingcode.main calls cli.CLI.Run, which eventually calls msgpack.Unmarshal
-      #3: internal/pingcodert/loader.go:15:2: pingcodert.init calls restish.init, which eventually calls msgpack.init
+    Example traces found:
+      #1: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls common.Common.CollectFields
+      #2: internal/pingcodert/loader.go:120:32: pingcodert.ConvertAPIDoc calls json.Marshal, which eventually calls common.init
+      #3: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls common.init
+      #4: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decoding.Decode
+      #5: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls decoding.init
+      #6: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls decoding.init
+      #7: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int16FromInt64
+      #8: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int32FromInt64
+      #9: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int64FromFloat64
+      #10: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int64FromInt16Bits
+      #11: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int64FromInt32Bits
+      #12: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int64FromInt64Bits
+      #13: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int64FromInt8Byte
+      #14: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int64FromUint64
+      #15: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int8FromByte
+      #16: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int8FromInt64
+      #17: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.IntFromInt64
+      #18: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.IntValueForKind
+      #19: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Uint16FromUint64
+      #20: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Uint32FromUint64
+      #21: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Uint64FromInt64
+      #22: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Uint8FromUint64
+      #23: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.UintFromUint64
+      #24: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.UintValueForKind
+      #25: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls decodingutil.init
+      #26: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls def.ComplexTypeCode
+      #27: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls def.init
+      #28: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls encoding.Encode
+      #29: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls encoding.init
+      #30: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls encoding.init
+      #31: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.DecoderCommon.ReadSize1
+      #32: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.DecoderCommon.ReadSize4
+      #33: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.DecoderCommon.ReadSize8
+      #34: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte1Int
+      #35: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte4Int
+      #36: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte4Uint64
+      #37: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte8Int64
+      #38: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte8Uint64
+      #39: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls ext.init
+      #40: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls msgpack.Marshal
+      #41: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls msgpack.Unmarshal
+      #42: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls msgpack.init
+      #43: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls time.init
+      #44: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls time.timeDecoder.AsValue
+      #45: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls time.timeDecoder.Code
+      #46: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls time.timeDecoder.IsType
+      #47: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls time.timeEncoder.CalcByteSize
+      #48: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls time.timeEncoder.Type
+      #49: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls time.timeEncoder.WriteToBytes
+      #50: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls time.timeStreamDecoder.Code
+      #51: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls time.timeStreamEncoder.Type
 
 Vulnerability #2: GO-2026-4513
     Denial of service in github.com/shamaton/msgpack
@@ -21,14 +65,12 @@ Vulnerability #2: GO-2026-4513
   Module: github.com/shamaton/msgpack/v3
     Found in: github.com/shamaton/msgpack/v3@v3.1.2
     Fixed in: N/A
-    Example reachable trace:
-      #1: cmd/pingcode/main.go:23:19: pingcode.main calls cli.CLI.Run, which eventually calls msgpack.Unmarshal
+    Example traces found:
+      #1: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls msgpack.Unmarshal
 
 Your code is affected by 2 vulnerabilities from 1 module.
-
-Resolved during this change:
-
-- GO-2026-5320 by upgrading github.com/yuin/goldmark to v1.7.17.
-- GO-2026-5026 by upgrading golang.org/x/net to v0.55.0.
-
-The remaining advisories have no upstream fixed version at the observation time.
+This scan also found 0 vulnerabilities in packages you import and 1
+vulnerability in modules you require, but your code doesn't appear to call these
+vulnerabilities.
+Use '-show verbose' for more details.
+exit status 3

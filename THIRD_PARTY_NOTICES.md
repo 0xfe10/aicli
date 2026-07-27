@@ -14,13 +14,15 @@ Evidence is maintained under `openwiki/compliance/`:
 ## Summary
 
 - Direct dependency: Restish `v2.3.0` (MIT)
-- Direct dependency for FNS Swagger conversion: `github.com/getkin/kin-openapi` (MIT)
-- Linked transitive modules for `./cmd/pingcode`: see inventory (currently 54)
+- Direct dependency for FNS Swagger conversion: `github.com/getkin/kin-openapi` `v0.145.0` (MIT)
+- Direct dependency for YAML decode: `gopkg.in/yaml.v3` `v3.0.1` (MIT)
+- Linked module union for `./cmd/aicli`, `./cmd/pingcode`, and `./cmd/fns`: see inventory
 - No GPLv3 detected in LICENSE scan of the linked closure
 - Apache-2.0 modules are present (for example `amazon-ion/ion-go`); include their NOTICE files from `openwiki/compliance/notices/` with release artifacts when shipping binaries
 - Vulnerability status has an upstream residual: `github.com/shamaton/msgpack/v3`
   GO-2026-4740 and GO-2026-4513 have no fixed version and are reachable through
-  the embedded Restish runtime
+  the embedded Restish runtime. This residual predates the FNS CLI work and is
+  not a new risk introduced by `kin-openapi`.
 
 ## Restish
 
