@@ -1,5 +1,5 @@
 surface:
-  source: https://obsidian-fns.kahub.in/openapi.yaml
+  source: https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/3.5.1/docs/swagger.yaml
   generation: runtime
   layout: tags
   naming: restish-method-and-path-fallback

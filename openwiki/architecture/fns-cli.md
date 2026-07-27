@@ -1,15 +1,19 @@
 # FNS CLI
 
 `fns` embeds Restish v2.3.0 and generates Note/File/Folder commands from the
-Fast Note Sync Swagger description.
+Fast Note Sync API description.
 
 ## Runtime path
 
-1. Fetch `FNS_SPEC_URL` (default `https://obsidian-fns.kahub.in/openapi.yaml`).
-2. `swagger2rt` detects Swagger 2.0 (JSON or YAML) and converts with `openapi2conv`.
-3. `fnsrt` removes localhost servers, converts `UserAuthToken` to HTTP Bearer,
-   strips duplicate `token` header parameters, and keeps only Note/File/Folder paths.
-4. Restish generates tag-grouped commands using Method + Path fallback names.
+1. Fetch `FNS_SPEC_URL` (default pinned Swagger 2.0 at
+   `https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/3.5.1/docs/swagger.yaml`).
+2. `fnsrt.SpecLoader` detects Swagger 2 or OpenAPI 3 (JSON/YAML).
+3. Swagger 2 is converted with `swagger2rt`; OpenAPI 3 is normalized to JSON.
+4. Both formats always run through `FixSpec` before Restish sees the document.
+5. Restish generates tag-grouped commands using Method + Path fallback names.
+
+Until FNS publishes a stable OpenAPI endpoint (M9), keep the default Spec URL on
+the pinned `3.5.1` tag. Do not switch the default to a branch tip.
 
 ## Auth and safety
 
@@ -29,12 +33,12 @@ Server-side OpenAPI 3 publication and Vault REST consistency are tracked as M9.
 
 ## Binary size note
 
-Linux amd64 stripped builds measured during implementation:
+Linux amd64 stripped release build (`VERSION=0.2.0`, `-trimpath -ldflags="-s -w"`):
 
-| binary   | size |
-|----------|------|
-| pingcode | 33M  |
-| fns      | 35M  |
+| binary   | size   |
+|----------|--------|
+| pingcode | ~33M   |
+| fns      | ~34.2M (`35827838` bytes) |
 
-The ~2M increase for `fns` is mainly from promoting `kin-openapi` / `openapi2conv`
-into the linked closure for Swagger 2 conversion.
+The increase for `fns` versus `pingcode` is mainly from `kin-openapi` / `openapi2conv`
+and YAML decode in the linked closure.

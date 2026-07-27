@@ -13,7 +13,9 @@ import (
 
 const (
 	DefaultBaseURL = "https://obsidian-fns.kahub.in"
-	DefaultSpecURL = "https://obsidian-fns.kahub.in/openapi.yaml"
+	// Pinned until FNS publishes a stable OpenAPI endpoint (M9). Do not point at
+	// branch tips; released CLIs must not drift with remote docs.
+	DefaultSpecURL = "https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/3.5.1/docs/swagger.yaml"
 	DefaultClient  = "aicli"
 	AuthType       = "fns-bearer"
 )
