@@ -2,36 +2,52 @@
 type: Architecture
 title: CLI Platform
 description: Repository structure and ownership boundaries for aicli.
-tags: [aicli, architecture, cli, services]
+tags: [aicli, architecture, cli, services, restish]
 ---
 
 # CLI platform
 
-`aicli` is a Go monorepo and distribution workspace for command-line tools that
-let AI agents use external services through narrow, stable command surfaces.
+`aicli` is a Go monorepo and distribution workspace for service-specific CLIs
+used by people and AI agents.
 
 ## Repository layout
 
-- `services/` is the service registry. Each service owns a `service.yaml` file and
-  a `commands.yaml` file.
-- `cmd/` contains release command entrypoints such as `aicli` and `pingcode`.
-- `internal/pingcode/` owns PingCode authentication, typed client, domain safety
-  logic, and command routing.
-- `internal/restishrt/` embeds Restish v2.3.0 for `pingcode raw` only.
-- `internal/cli/` contains shared JSON output and exit codes.
+- `services/` registers each service and records how its command surface is built.
+- `cmd/` contains release entrypoints such as `aicli` and `pingcode`.
+- `internal/<service>rt/` contains only the service adapters needed by Restish.
+- `internal/cli/` contains helpers used by the umbrella registry command.
 - `openwiki/` is the durable project knowledge layer.
 
-## Implementation boundary
+## Runtime model
 
-Service CLIs are Go commands. They expose service-specific business commands while
-sharing common output, redaction, registry, and optional Restish raw transport
-support through `internal/`.
+The preferred service CLI model is:
 
-PingCode domain commands use a typed Go HTTP client. Restish is not used for
-create/update/transition/comment because its FetchResponse API does not support
-request bodies and its Run path owns its own output tree.
+```text
+service binary
+  -> embedded Restish
+  -> OpenAPI or a small service-specific specification loader
+  -> generated operation commands
+  -> service-specific authentication handler
+  -> service API
+```
 
-## Restish direction
+Restish owns command generation, request construction, output formats, filtering,
+pagination, caching, retries, profiles, and transport options. The repository owns
+only branding, service discovery, specification adaptation, authentication that
+Restish does not provide, and narrow safety policy.
 
-Restish v2.3.0 is compiled into the `pingcode` binary and exposed only as
-`pingcode raw`. Users do not need a separate Restish install.
+This keeps each service binary independently installable while avoiding a second
+Restish executable or a large handwritten API client. A service with a usable
+OpenAPI document may need almost no loader code. PingCode needs a loader because
+its official description uses a vendor JSON format rather than OpenAPI.
+
+## Command stability
+
+Generated command names follow the upstream specification. They are deterministic,
+but they are not a separately curated compatibility layer. When an upstream API
+record is added or removed, the generated surface changes after Restish refreshes
+the specification cache.
+
+Handwritten aliases and semantic wrappers are not added by default. They are only
+justified when a concrete workflow cannot be expressed safely through the generated
+operation and the maintenance cost is explicitly accepted.

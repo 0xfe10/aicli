@@ -1,84 +1,28 @@
-commands:
-  - name: pingcode version
+surface:
+  source: https://open.pingcode.com/api_data.json
+  generation: runtime
+  layout: tags
+  naming: deterministic-method-and-path
+  coverage: all-supported-http-records
+  excluded:
+    - token and OAuth endpoints handled outside the generated API surface
+    - records with unsupported HTTP methods
+support_commands:
+  namespace: pingcode cli
+examples:
+  - name: pingcode pjm get-projects
     mode: read
-    description: Print CLI, Go, Restish, and commit versions.
-    output: json
-  - name: pingcode config check
+  - name: pingcode pjm get-work-items-by-work-item-id
     mode: read
-    description: Validate local PingCode configuration without revealing credentials.
-    output: json
-  - name: pingcode auth status
-    mode: read
-    description: Report authentication mode and redacted status.
-    output: json
-  - name: pingcode auth login
-    mode: auth
-    description: Start PingCode user OAuth and persist a random state.
-    output: json
-  - name: pingcode auth complete
-    mode: auth
-    description: Complete OAuth from a callback URL read on stdin.
-    output: json
-  - name: pingcode auth logout
-    mode: auth
-    description: Remove stored PingCode user authentication.
-    output: json
-  - name: pingcode project list
-    mode: read
-    description: List available PingCode projects.
-    output: json
-  - name: pingcode project schema
-    mode: read
-    description: Show project work item schema and available transitions.
-    output: json
-  - name: pingcode work-item get
-    mode: read
-    description: Fetch a work item by id or identifier.
-    output: json
-  - name: pingcode work-item search
-    mode: read
-    description: Search work items across kinds with dedupe and pagination metadata.
-    output: json
-  - name: pingcode work-item mine
-    mode: read
-    description: List work items for the current user or default assignee.
-    output: json
-  - name: pingcode work-item create
+  - name: pingcode pjm post-work-items
     mode: write
-    description: Plan or apply work item creation.
-    dry_run_default: true
-    apply_flag: --apply
-    output: json
-  - name: pingcode work-item update
-    mode: write
-    description: Plan or apply work item field updates.
-    dry_run_default: true
-    apply_flag: --apply
-    expected_state_guard: expected-current-state
-    output: json
-  - name: pingcode work-item transition
-    mode: write
-    description: Plan or apply a work item status transition.
-    dry_run_default: true
-    apply_flag: --apply
-    expected_state_guard: expected-current-state
-    output: json
-  - name: pingcode work-item comment
-    mode: write
-    description: Plan or apply a work item comment.
-    dry_run_default: true
-    apply_flag: --apply
-    output: json
-  - name: pingcode raw
-    mode: debug
-    description: Controlled net/http escape hatch for raw PingCode API debugging. Prefer --body-stdin for credential-bearing payloads. Restish is linked for version/compliance only.
-    output: json
-deferred:
-  - name: pingcode work-item triage
-    reason: Evaluate after first release stabilizes.
-  - name: pingcode work-item bulk-update
-    reason: Evaluate after first release stabilizes.
-  - name: relations
-    reason: Deferred from first release.
-  - name: import
-    reason: Deferred from first release.
+write_policy:
+  environment: PINGCODE_WRITE_MODE
+  default: readonly
+  write: permits POST, PUT, PATCH
+  destructive: also permits DELETE
+output:
+  owner: restish
+  formats: [auto, json, yaml, table, csv, tsv, markdown, raw]
+  filtering: restish
+  pagination: restish

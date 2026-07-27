@@ -55,11 +55,11 @@ Generated for `./cmd/pingcode` dependency closure on release commands.
 | `github.com/x448/float16` | `v0.8.4` | MIT | LICENSE | no |
 | `github.com/xo/terminfo` | `v0.0.0-20220910002029-abceb7e1c41e` | MIT | LICENSE | no |
 | `github.com/yuin/goldmark-emoji` | `v1.0.6` | MIT | LICENSE | no |
-| `github.com/yuin/goldmark` | `v1.7.13` | MIT | LICENSE | no |
-| `golang.org/x/net` | `v0.50.0` | BSD-3-Clause | LICENSE | no |
+| `github.com/yuin/goldmark` | `v1.7.17` | MIT | LICENSE | no |
+| `golang.org/x/net` | `v0.55.0` | BSD-3-Clause | LICENSE | no |
 | `golang.org/x/sync` | `v0.21.0` | BSD-3-Clause | LICENSE | no |
-| `golang.org/x/sys` | `v0.42.0` | BSD-3-Clause | LICENSE | no |
-| `golang.org/x/term` | `v0.41.0` | BSD-3-Clause | LICENSE | no |
+| `golang.org/x/sys` | `v0.45.0` | BSD-3-Clause | LICENSE | no |
+| `golang.org/x/term` | `v0.43.0` | BSD-3-Clause | LICENSE | no |
 | `golang.org/x/text` | `v0.39.0` | BSD-3-Clause | LICENSE | no |
 | `go.yaml.in/yaml/v3` | `v3.0.4` | MIT | LICENSE | no |
 | `go.yaml.in/yaml/v4` | `v4.0.0-rc.4` | Apache-2.0 | LICENSE | yes |
@@ -76,11 +76,13 @@ Generated for `./cmd/pingcode` dependency closure on release commands.
 
 See [`govulncheck.txt`](govulncheck.txt).
 
-- Cleared: `golang.org/x/text` GO-2026-5970 by upgrading to v0.39.0.
-- Open: `github.com/shamaton/msgpack/v3` GO-2026-4740 (Fixed in: N/A; entered via Restish init).
-- Release gate: **blocked** until msgpack residual risk is accepted in writing or Restish link surface is reduced.
+- Cleared by dependency updates: `github.com/yuin/goldmark` GO-2026-5320 and
+  `golang.org/x/net` GO-2026-5026.
+- Open: `github.com/shamaton/msgpack/v3` GO-2026-4740 and GO-2026-4513
+  (both `Fixed in: N/A`; reachable through the embedded Restish runtime).
+- Release decision still requires the repository owner to accept the upstream
+  `msgpack` denial-of-service residual or wait for a fixed Restish dependency graph.
 
 ## go mod verify
 
 See [`go-mod-verify.txt`](go-mod-verify.txt).
-

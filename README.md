@@ -2,75 +2,62 @@
 
 `aicli` is a Go monorepo for AI-oriented service CLIs.
 
-The first delivered service CLI is `pingcode`: a small, agent-safe command surface
-over PingCode project workflows. Domain commands use a typed Go client. Restish
-v2.3.0 is embedded only for `pingcode raw` debugging.
+The first service CLI is `pingcode`. It embeds [Restish](https://rest.sh/) v2.3.0
+and generates commands from PingCode's official API description at runtime. Users
+install only the `pingcode` binary; a separate Restish installation is not needed.
 
 ## Structure
 
 - `cmd/` contains release command entrypoints.
-- `internal/pingcode/` contains PingCode config, auth, typed client, domain service, and command routing.
-- `internal/restishrt/` embeds Restish for raw API debugging.
-- `internal/cli/` contains shared JSON output and exit-code helpers.
-- `services/` contains service CLI registrations and command manifests.
-- `openwiki/` contains repository knowledge, architecture notes, and decisions.
+- `internal/pingcodert/` adapts PingCode's API description and authentication to Restish.
+- `internal/cli/` contains JSON helpers used by the `aicli` registry command.
+- `services/` contains service registrations and command-surface metadata.
+- `openwiki/` contains repository knowledge and architecture decisions.
 
-## Local commands
+## PingCode
 
-List registered service CLIs:
-
-```sh
-go run ./cmd/aicli services
-```
-
-PingCode CLI:
+Set either a fixed access token or client credentials:
 
 ```sh
-go run ./cmd/pingcode version
-go run ./cmd/pingcode config check
-go run ./cmd/pingcode auth status
+export PINGCODE_CLIENT_ID='...'
+export PINGCODE_CLIENT_SECRET='...'
 ```
 
-Write commands default to dry-run. Pass `--apply` to execute:
+Discover and call generated commands:
 
 ```sh
-printf '%s\n' '{"kind":"bug","title":"demo"}' | go run ./cmd/pingcode work-item create --input -
+go run ./cmd/pingcode --help
+go run ./cmd/pingcode pjm --help
+go run ./cmd/pingcode pjm get-projects -o json
 ```
 
-## Configuration
+The default mode permits only `GET`, `HEAD`, and `OPTIONS`. Enable writes
+explicitly for a trusted session:
 
-Environment variables follow the PingCode MCP naming:
+```sh
+export PINGCODE_WRITE_MODE=write        # also allow POST, PUT, PATCH
+export PINGCODE_WRITE_MODE=destructive  # also allow DELETE
+```
 
-- `PINGCODE_BASE_URL`
-- `PINGCODE_API_BASE_URL`
+Configuration:
+
 - `PINGCODE_ACCESS_TOKEN`
 - `PINGCODE_CLIENT_ID` / `PINGCODE_CLIENT_SECRET`
-- `PINGCODE_AUTH_TOKEN_PATH` (default `$XDG_CONFIG_HOME/aicli/pingcode/auth.json`)
-- `PINGCODE_PROJECT_IDENTIFIER` / `PINGCODE_PROJECT_ID`
-- `PINGCODE_DEFAULT_ASSIGNEE_NAME`
-- `PINGCODE_READONLY`
-- `PINGCODE_TIMEOUT_MS`
+- `PINGCODE_WRITE_MODE`: `readonly` (default), `write`, or `destructive`
+- `PINGCODE_API_BASE_URL`: defaults to `https://open.pingcode.com`
+- `PINGCODE_SPEC_URL`: defaults to `https://open.pingcode.com/api_data.json`
+- `RSH_CONFIG`, `RSH_CONFIG_DIR`, and `RSH_CACHE_DIR`: optional Restish state overrides
 
-API host cannot be overridden by CLI flags. Tokens are never accepted as argv.
+Restish provides the request body, output, filtering, pagination, cache, retry,
+profile, and TLS options. Use command-level `--help` for the generated flags.
 
-## Build
+## Build and verify
 
 ```sh
+just verify
+just pingcode-spec-check
 just build-pingcode
 ```
 
-Produces static Linux `amd64`/`arm64` binaries and SHA256 sidecars under `dist/`.
-
-## Tests
-
-```sh
-go test ./...
-go test -race ./...
-go vet ./...
-go mod verify
-```
-
-## License notices
-
-See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for embedded Restish MIT
-attribution.
+Release binaries are static (`CGO_ENABLED=0`) and built with stripped symbols.
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for embedded dependency notices.

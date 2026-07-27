@@ -4,24 +4,27 @@ status: active
 implementation:
   type: go-command
   repository: https://github.com/0xfe10/aicli
-  behavior_authority: https://github.com/0xfe10/pingcode-mcp@9e7589f39535aed35b03ff9c191f1f55cd7b79a2
   package: ./cmd/pingcode
   command: pingcode
-  transport: typed-go-client
-  raw_transport: embedded-restish-v2.3.0
-contract:
-  stdout: single-json-document
-  stderr: diagnostics-only
-  writes_default_to_dry_run: true
-  apply_flag: --apply
-  expected_state_guard: expected-current-state
-  secrets_in_output: forbidden
+  transport: embedded-restish-v2.3.0
+  api_description: https://open.pingcode.com/api_data.json
+  api_description_format: pingcode-api-data
+authentication:
+  supported:
+    - access-token
+    - client-credentials
+  default: client-credentials
+safety:
+  write_mode_default: readonly
+  write_modes:
+    readonly: [GET, HEAD, OPTIONS]
+    write: [GET, HEAD, OPTIONS, POST, PUT, PATCH]
+    destructive: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]
 notes:
-  - Ported MCP client/auth/work-item safety behavior into Go.
-  - Keep the existing PingCode MCP deployment as comparison and rollback.
-  - Do not expose all PingCode REST endpoints as first-class AI commands.
-  - Restish is available only through `pingcode raw`.
+  - Restish generates the operation commands and executes API requests.
+  - The local adapter converts PingCode's vendor API description to OpenAPI 3.1.
+  - OAuth and handwritten semantic command aliases are intentionally not included.
 openwiki:
   overview: openwiki/architecture/cli-platform.md
   contract: openwiki/decisions/service-cli-contract.md
-  milestone0: openwiki/architecture/pingcode-milestone0.md
+  pingcode: openwiki/architecture/pingcode-milestone0.md

@@ -2,7 +2,10 @@ module github.com/0xfe10/aicli
 
 go 1.25.3
 
-require github.com/rest-sh/restish/v2 v2.3.0
+require (
+	github.com/pb33f/libopenapi v0.35.0
+	github.com/rest-sh/restish/v2 v2.3.0
+)
 
 require (
 	github.com/alecthomas/chroma/v2 v2.23.1 // indirect
@@ -38,7 +41,6 @@ require (
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/pb33f/jsonpath v0.8.2 // indirect
-	github.com/pb33f/libopenapi v0.35.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sandrolain/httpcache v1.4.0 // indirect
@@ -50,13 +52,13 @@ require (
 	github.com/tidwall/jsonc v0.3.3 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	github.com/yuin/goldmark v1.7.13 // indirect
+	github.com/yuin/goldmark v1.7.17 // indirect
 	github.com/yuin/goldmark-emoji v1.0.6 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.4 // indirect
-	golang.org/x/net v0.50.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/term v0.41.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/text v0.39.0 // indirect
 )

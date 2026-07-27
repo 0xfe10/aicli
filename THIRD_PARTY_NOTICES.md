@@ -17,7 +17,9 @@ Evidence is maintained under `openwiki/compliance/`:
 - Linked transitive modules for `./cmd/pingcode`: see inventory (currently 54)
 - No GPLv3 detected in LICENSE scan of the linked closure
 - Apache-2.0 modules are present (for example `amazon-ion/ion-go`); include their NOTICE files from `openwiki/compliance/notices/` with release artifacts when shipping binaries
-- Vulnerability status is **incomplete for release**: `github.com/shamaton/msgpack/v3` GO-2026-4740 has no upstream fix and is reachable through Restish initialization
+- Vulnerability status has an upstream residual: `github.com/shamaton/msgpack/v3`
+  GO-2026-4740 and GO-2026-4513 have no fixed version and are reachable through
+  the embedded Restish runtime
 
 ## Restish
 

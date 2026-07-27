@@ -1,15 +1,15 @@
-commands:
-  - name: example status
+surface:
+  source: https://api.example.com/openapi.json
+  generation: runtime
+  layout: tags
+  naming: upstream-operation-id
+support_commands:
+  namespace: example cli
+examples:
+  - name: example resources list-resources
     mode: read
-    description: Check service authentication and configuration.
-    output: json
-  - name: example resource list
-    mode: read
-    description: List resources with pagination metadata.
-    output: json
-  - name: example resource update
-    mode: write
-    description: Plan or apply a resource update.
-    dry_run_default: true
-    apply_flag: --apply
-    output: json
+write_policy:
+  environment: EXAMPLE_WRITE_MODE
+  default: readonly
+output:
+  owner: restish

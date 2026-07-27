@@ -1,66 +1,46 @@
 ---
 type: Decision
 title: Service CLI Contract
-description: Initial contract for AI-oriented service CLIs.
-tags: [aicli, decisions, cli-contract, json]
+description: Contract for Restish-backed service CLIs.
+tags: [aicli, decisions, cli-contract, restish]
 ---
 
 # Service CLI contract
 
-Service CLIs should expose a small, stable command surface for AI agents rather
-than every raw API endpoint.
+Service binaries embed Restish and expose commands generated from an upstream API
+description. The binary name, defaults, authentication, and safety policy remain
+service-specific; generic API mechanics remain owned by Restish.
 
-## Output
+## Required local contract
 
-Successful commands write exactly one JSON document to stdout:
+Each service integration defines:
 
-```json
-{
-  "ok": true,
-  "data": {},
-  "meta": {}
-}
-```
+- one independently installable command under `cmd/`;
+- an authoritative specification URL or discovery mechanism;
+- the smallest adapter needed to make that specification usable by Restish;
+- a credential source that does not require secrets on argv;
+- a default policy that blocks unintended writes;
+- tests for specification loading, authentication, and the safety gate.
 
-Failed commands write exactly one JSON document to stdout:
+Credentials may come from environment variables or Restish's credential/token
+stores. Errors must not include access tokens, client secrets, authorization codes,
+or token endpoint response bodies.
 
-```json
-{
-  "ok": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable error"
-  }
-}
-```
+## Generated surface
 
-stderr is reserved for diagnostics. Tokens, client secrets, authorization codes,
-and other credentials must not be written to stdout or stderr.
+Restish owns operation flags, request bodies, output formats, filtering,
+pagination, caching, retries, profiles, TLS, and HTTP execution. Service manifests
+describe the generation policy and examples; they do not duplicate every generated
+operation.
+
+Command names track the upstream specification and are not promised as a manually
+versioned semantic API. Do not add aliases solely to shorten generated names.
 
 ## Writes
 
-Write commands default to planning mode. They should only execute remote writes
-when the caller passes `--apply`.
+Every service must default to read-only operation. A service may expose explicit
+write levels appropriate to its API. A permitted write is a real request, so help
+text and service metadata must not describe the gate as planning or dry-run.
 
-State-changing commands should support an expected-state guard when the backing
-service has mutable workflow state. No-change updates should avoid sending write
-requests.
-
-## Pagination and retries
-
-Paginated reads must return pagination metadata, including whether results were
-truncated and how the caller can continue.
-
-Read retries should be bounded. Non-idempotent writes should not be retried
-blindly.
-
-## Restish-backed CLIs
-
-Restish-backed commands are allowed when they sit behind a service-specific Go
-command surface. The Go command remains responsible for authentication lifecycle,
-token refresh, redaction, dry-run behavior, workflow guards, and stable JSON
-errors.
-
-Credentials should be stored through a local secret mechanism, not committed to
-the repository. Commands should avoid taking tokens or client secrets as
-command-line options.
+Handwritten workflow guards or semantic commands require a demonstrated limitation
+in the generated surface and a separate decision accepting their maintenance cost.

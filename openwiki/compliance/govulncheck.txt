@@ -1,3 +1,7 @@
+Command: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+Observed: 2026-07-27 UTC
+Exit status: 3
+
 === Symbol Results ===
 
 Vulnerability #1: GO-2026-4740
@@ -6,26 +10,25 @@ Vulnerability #1: GO-2026-4740
   Module: github.com/shamaton/msgpack/v3
     Found in: github.com/shamaton/msgpack/v3@v3.1.2
     Fixed in: N/A
-    Example traces found:
-      #1: internal/pingcode/auth_store.go:298:22: pingcode.SaveOAuthState calls json.Encoder.Encode, which eventually calls common.init
-      #2: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls common.init
-      #3: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls decoding.init
-      #4: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls decoding.init
-      #5: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls decodingutil.init
-      #6: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls def.init
-      #7: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls encoding.init
-      #8: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls encoding.init
-      #9: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls ext.init
-      #10: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls msgpack.init
-      #11: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls time.init
-      #12: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls time.timeDecoder.Code
-      #13: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls time.timeEncoder.Type
-      #14: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls time.timeStreamDecoder.Code
-      #15: internal/restishrt/runtime.go:15:2: restishrt.init calls restish.init, which eventually calls time.timeStreamEncoder.Type
+    Representative reachable traces:
+      #1: cmd/pingcode/main.go:23:19: pingcode.main calls cli.CLI.Run, which eventually calls msgpack.Marshal
+      #2: cmd/pingcode/main.go:23:19: pingcode.main calls cli.CLI.Run, which eventually calls msgpack.Unmarshal
+      #3: internal/pingcodert/loader.go:15:2: pingcodert.init calls restish.init, which eventually calls msgpack.init
 
-Your code is affected by 1 vulnerability from 1 module.
-This scan also found 8 vulnerabilities in packages you import and 4
-vulnerabilities in modules you require, but your code doesn't appear to call
-these vulnerabilities.
-Use '-show verbose' for more details.
-exit:3
+Vulnerability #2: GO-2026-4513
+    Denial of service in github.com/shamaton/msgpack
+  More info: https://pkg.go.dev/vuln/GO-2026-4513
+  Module: github.com/shamaton/msgpack/v3
+    Found in: github.com/shamaton/msgpack/v3@v3.1.2
+    Fixed in: N/A
+    Example reachable trace:
+      #1: cmd/pingcode/main.go:23:19: pingcode.main calls cli.CLI.Run, which eventually calls msgpack.Unmarshal
+
+Your code is affected by 2 vulnerabilities from 1 module.
+
+Resolved during this change:
+
+- GO-2026-5320 by upgrading github.com/yuin/goldmark to v1.7.17.
+- GO-2026-5026 by upgrading golang.org/x/net to v0.55.0.
+
+The remaining advisories have no upstream fixed version at the observation time.
