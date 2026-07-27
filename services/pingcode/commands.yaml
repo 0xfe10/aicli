@@ -71,7 +71,7 @@ commands:
     output: json
   - name: pingcode raw
     mode: debug
-    description: Controlled net/http escape hatch for raw PingCode API debugging. Restish is linked for version/compliance only.
+    description: Controlled net/http escape hatch for raw PingCode API debugging. Prefer --body-stdin for credential-bearing payloads. Restish is linked for version/compliance only.
     output: json
 deferred:
   - name: pingcode work-item triage

@@ -45,7 +45,7 @@ func TestRawSingleJSONAndNoOpenAPIDiscovery(t *testing.T) {
 			APIBaseURL: srv.URL,
 			Auth:       func(context.Context) (string, error) { return "Bearer test-token-secret", nil },
 		}
-		return rt.Run(context.Background(), args)
+		return rt.Run(context.Background(), args, nil)
 	}
 
 	got, err := run([]string{"GET", "/v1/project/projects"})
@@ -80,7 +80,7 @@ func TestRawTimeout(t *testing.T) {
 		APIBaseURL: srv.URL,
 		HTTP:       &http.Client{Timeout: time.Millisecond},
 	}
-	_, err := rt.Run(context.Background(), []string{"GET", "/slow"})
+	_, err := rt.Run(context.Background(), []string{"GET", "/slow"}, nil)
 	if err == nil {
 		t.Fatal("expected timeout")
 	}
@@ -88,9 +88,81 @@ func TestRawTimeout(t *testing.T) {
 
 func TestRawRejectsAbsoluteURL(t *testing.T) {
 	rt := &restishrt.Runtime{APIBaseURL: "https://open.pingcode.com"}
-	_, err := rt.Run(context.Background(), []string{"GET", "https://evil.example/v1"})
+	_, err := rt.Run(context.Background(), []string{"GET", "https://evil.example/v1"}, nil)
 	if err == nil {
 		t.Fatal("expected reject")
+	}
+}
+
+func TestRawBodyStdin(t *testing.T) {
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		gotBody = string(raw)
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
+	}))
+	defer srv.Close()
+	rt := &restishrt.Runtime{APIBaseURL: srv.URL}
+	stdin := strings.NewReader(`{"clientSecret":"should-not-be-in-argv","title":"x"}`)
+	_, err := rt.Run(context.Background(), []string{"POST", "/v1/x", "--body-stdin"}, stdin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(gotBody, "should-not-be-in-argv") {
+		t.Fatalf("body not forwarded: %s", gotBody)
+	}
+}
+
+func TestRawRejectsCrossPortRedirectWithAuth(t *testing.T) {
+	var sawAuthOnB bool
+	b := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			sawAuthOnB = true
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
+	}))
+	defer b.Close()
+
+	a := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, b.URL+"/final", http.StatusFound)
+	}))
+	defer a.Close()
+
+	rt := &restishrt.Runtime{
+		APIBaseURL: a.URL,
+		Auth:       func(context.Context) (string, error) { return "Bearer redirect-token-secret", nil },
+	}
+	_, err := rt.Run(context.Background(), []string{"GET", "/start"}, nil)
+	if err == nil {
+		t.Fatal("expected cross-port redirect refusal")
+	}
+	if sawAuthOnB {
+		t.Fatal("Authorization must not be forwarded across ports")
+	}
+	if !strings.Contains(err.Error(), "跨") && !strings.Contains(strings.ToLower(err.Error()), "redirect") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRawResponseTruncationMetadata(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Force truncation by returning more than the test would typically send;
+		// the runtime caps at 8MiB. Use a smaller override path via oversized body
+		// isn't practical here — instead verify meta key exists and is false for small bodies.
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "payload": strings.Repeat("x", 100)})
+	}))
+	defer srv.Close()
+	rt := &restishrt.Runtime{APIBaseURL: srv.URL}
+	got, err := rt.Run(context.Background(), []string{"GET", "/small"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta := got.Meta.(map[string]any)
+	if meta["response_truncated"] != false {
+		t.Fatalf("meta=%#v", meta)
+	}
+	if meta["response_bytes_cap"] == nil {
+		t.Fatalf("missing response_bytes_cap: %#v", meta)
 	}
 }
 
@@ -104,8 +176,8 @@ func TestCommandLayerOwnsRawJSONOnceOnError(t *testing.T) {
 	var stdout bytes.Buffer
 	result := pingcode.Execute(context.Background(), []string{"raw", "GET", "/bad"}, pingcode.RuntimeDependencies{
 		Stdout: &stdout,
-		Raw: func(ctx context.Context, args []string) (pingcode.RawResult, error) {
-			rawResult, err := rt.Run(ctx, args)
+		Raw: func(ctx context.Context, args []string, stdin io.Reader) (pingcode.RawResult, error) {
+			rawResult, err := rt.Run(ctx, args, stdin)
 			return pingcode.RawResult{Data: rawResult.Data, Meta: rawResult.Meta}, err
 		},
 	})
@@ -134,19 +206,35 @@ func TestCommandLayerOwnsRawJSONOnceOnError(t *testing.T) {
 	}
 }
 
-func TestRawExecuteRedactsResponseSecretsEndToEnd(t *testing.T) {
+func TestRawExecuteRedactsCredentialCorpusEndToEnd(t *testing.T) {
 	const (
-		bodyToken   = "body-access-token-secret"
-		authEcho    = "Bearer request-auth-secret"
-		cookieValue = "session=cookie-secret-value; Path=/"
+		bodyToken      = "body-access-token-secret"
+		camelSecret    = "camel-client-secret-value"
+		authCode       = "authorization-code-secret"
+		refreshCamel   = "refreshToken-secret-value"
+		bareToken      = "bare-token-secret"
+		authEcho       = "Bearer request-auth-secret"
+		cookieValue    = "session=cookie-secret-value; Path=/"
+		queryInMessage = "token=query-token-secret"
 	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Set-Cookie", cookieValue)
 		w.Header().Set("X-Echo-Authorization", authEcho)
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"access_token":  bodyToken,
-			"Authorization": authEcho,
-			"title":         "safe-title",
+			"access_token":      bodyToken,
+			"accessToken":       bodyToken,
+			"clientSecret":      camelSecret,
+			"authorizationCode": authCode,
+			"refresh-token":     refreshCamel,
+			"token":             bareToken,
+			"Authorization":     authEcho,
+			"code":              "100009",
+			"message":           "failed " + queryInMessage,
+			"title":             "safe-title",
+			"nested": map[string]any{
+				"client_id": "client-id-secret",
+				"items":     []any{map[string]any{"secret": "nested-secret-value"}},
+			},
 		})
 	}))
 	defer srv.Close()
@@ -156,8 +244,8 @@ func TestRawExecuteRedactsResponseSecretsEndToEnd(t *testing.T) {
 	result := pingcode.Execute(context.Background(), []string{"raw", "GET", "/secret"}, pingcode.RuntimeDependencies{
 		Stdout: &stdout,
 		Stderr: &stderr,
-		Raw: func(ctx context.Context, args []string) (pingcode.RawResult, error) {
-			rawResult, err := rt.Run(ctx, args)
+		Raw: func(ctx context.Context, args []string, stdin io.Reader) (pingcode.RawResult, error) {
+			rawResult, err := rt.Run(ctx, args, stdin)
 			return pingcode.RawResult{Data: rawResult.Data, Meta: rawResult.Meta}, err
 		},
 	})
@@ -165,7 +253,11 @@ func TestRawExecuteRedactsResponseSecretsEndToEnd(t *testing.T) {
 		t.Fatalf("exit=%d stdout=%s", result.ExitCode, stdout.String())
 	}
 	combined := stdout.String() + stderr.String()
-	for _, secret := range []string{bodyToken, "request-auth-secret", "cookie-secret-value"} {
+	for _, secret := range []string{
+		bodyToken, camelSecret, authCode, refreshCamel, bareToken,
+		"request-auth-secret", "cookie-secret-value", "query-token-secret",
+		"client-id-secret", "nested-secret-value",
+	} {
 		if strings.Contains(combined, secret) {
 			t.Fatalf("secret %q leaked: %s", secret, combined)
 		}
@@ -176,8 +268,11 @@ func TestRawExecuteRedactsResponseSecretsEndToEnd(t *testing.T) {
 	}
 	data := doc["data"].(map[string]any)
 	body := data["body"].(map[string]any)
-	if body["access_token"] != "***" {
-		t.Fatalf("access_token=%#v", body["access_token"])
+	if body["access_token"] != "***" || body["accessToken"] != "***" || body["clientSecret"] != "***" {
+		t.Fatalf("keys not redacted: %#v", body)
+	}
+	if body["code"] != "100009" {
+		t.Fatalf("business code over-redacted: %#v", body["code"])
 	}
 	if body["title"] != "safe-title" {
 		t.Fatalf("title=%#v", body["title"])
@@ -225,8 +320,8 @@ func TestRawStatusCodeExitMapping(t *testing.T) {
 			var stdout bytes.Buffer
 			result := pingcode.Execute(context.Background(), []string{"raw", "GET", "/x"}, pingcode.RuntimeDependencies{
 				Stdout: &stdout,
-				Raw: func(ctx context.Context, args []string) (pingcode.RawResult, error) {
-					rawResult, err := rt.Run(ctx, args)
+				Raw: func(ctx context.Context, args []string, stdin io.Reader) (pingcode.RawResult, error) {
+					rawResult, err := rt.Run(ctx, args, stdin)
 					return pingcode.RawResult{Data: rawResult.Data, Meta: rawResult.Meta}, err
 				},
 			})

@@ -23,6 +23,7 @@ const (
 	CodeRateLimited           = "RATE_LIMITED"
 	CodeUpstreamTimeout       = "UPSTREAM_TIMEOUT"
 	CodeUpstreamError         = "UPSTREAM_ERROR"
+	CodePartialSuccess        = "PARTIAL_SUCCESS"
 	CodeInternalError         = "INTERNAL_ERROR"
 	CodeUnknownCommand        = "UNKNOWN_COMMAND"
 )
@@ -32,6 +33,7 @@ type Error struct {
 	Code    string
 	Message string
 	Cause   error
+	Data    any
 }
 
 func (e *Error) Error() string {
@@ -51,6 +53,11 @@ func (e *Error) Unwrap() error {
 // NewError constructs a classified error.
 func NewError(code, message string) *Error {
 	return &Error{Code: code, Message: message}
+}
+
+// NewErrorWithData constructs a classified error that still carries a data payload.
+func NewErrorWithData(code, message string, data any) *Error {
+	return &Error{Code: code, Message: message, Data: data}
 }
 
 // WrapError classifies an existing error with a stable code.

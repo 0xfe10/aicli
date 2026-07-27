@@ -424,3 +424,123 @@ func TestSchemaLoadsAllMemberPages(t *testing.T) {
 		t.Fatalf("members=%d want 101", len(members))
 	}
 }
+
+func TestTransitionCommentPartialSuccess(t *testing.T) {
+	var patches, comments atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/auth/token":
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "t", "expires_in": 3600})
+		case r.URL.Path == "/v1/project/projects":
+			_ = json.NewEncoder(w).Encode(page([]any{
+				map[string]any{"id": "p1", "identifier": "DEMO", "name": "Demo", "type": "scrum"},
+			}))
+		case r.URL.Path == "/v1/project/work_item/types":
+			_ = json.NewEncoder(w).Encode(page([]any{
+				map[string]any{"id": "bug", "name": "缺陷"},
+			}))
+		case r.URL.Path == "/v1/project/work_item/states":
+			_ = json.NewEncoder(w).Encode(page([]any{
+				map[string]any{"id": "s1", "name": "新提交"},
+				map[string]any{"id": "s2", "name": "处理中"},
+			}))
+		case r.URL.Path == "/v1/project/work_item/priorities":
+			_ = json.NewEncoder(w).Encode(page([]any{}))
+		case strings.HasSuffix(r.URL.Path, "/members"):
+			_ = json.NewEncoder(w).Encode(page([]any{}))
+		case r.URL.Path == "/v1/project/work_items" && r.Method == http.MethodGet:
+			_ = json.NewEncoder(w).Encode(page([]any{map[string]any{
+				"id": "wi1", "identifier": "DEMO-1", "title": "Bug", "type": "bug",
+				"state": map[string]any{"id": "s1", "name": "新提交"},
+			}}))
+		case strings.HasPrefix(r.URL.Path, "/v1/project/work_items/wi1") && r.Method == http.MethodGet && !strings.Contains(r.URL.Path, "comments"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id": "wi1", "identifier": "DEMO-1", "title": "Bug", "type": "bug",
+				"state": map[string]any{"id": "s1", "name": "新提交"},
+			})
+		case strings.HasPrefix(r.URL.Path, "/v1/project/work_items/wi1") && r.Method == http.MethodPatch:
+			patches.Add(1)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id": "wi1", "identifier": "DEMO-1", "title": "Bug", "type": "bug",
+				"state": map[string]any{"id": "s2", "name": "处理中"},
+			})
+		case strings.Contains(r.URL.Path, "/comments") && r.Method == http.MethodPost:
+			comments.Add(1)
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]any{"message": "comment boom"})
+		default:
+			// state plans absent -> transitionAllowed nil, allowed to proceed
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	t.Setenv("PINGCODE_API_BASE_URL", srv.URL)
+	t.Setenv("PINGCODE_BASE_URL", "https://example.pingcode.com")
+	t.Setenv("PINGCODE_CLIENT_ID", "cid")
+	t.Setenv("PINGCODE_CLIENT_SECRET", "csecret")
+	t.Setenv("PINGCODE_AUTH_TOKEN_PATH", filepath.Join(dir, "auth.json"))
+	t.Setenv("PINGCODE_PROJECT_IDENTIFIER", "DEMO")
+
+	var stdout bytes.Buffer
+	result := pingcode.Execute(context.Background(), []string{"work-item", "transition", "--input", "-", "--apply"}, pingcode.RuntimeDependencies{
+		Stdout: &stdout,
+		Stdin: strings.NewReader(`{
+			"kind":"bug",
+			"workItemId":"wi1",
+			"expectedCurrentState":"新提交",
+			"statusName":"处理中",
+			"comment":"after transition"
+		}`),
+	})
+	if result.ExitCode != cli.ExitPartialSuccess {
+		t.Fatalf("exit=%d out=%s", result.ExitCode, stdout.String())
+	}
+	if patches.Load() != 1 || comments.Load() != 1 {
+		t.Fatalf("patches=%d comments=%d", patches.Load(), comments.Load())
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc["ok"] != false {
+		t.Fatalf("doc=%#v", doc)
+	}
+	errBody := doc["error"].(map[string]any)
+	if errBody["code"] != pingcode.CodePartialSuccess {
+		t.Fatalf("code=%v", errBody["code"])
+	}
+	data := doc["data"].(map[string]any)
+	if data["commentApplied"] != false {
+		t.Fatalf("commentApplied=%v", data["commentApplied"])
+	}
+	updated := data["updated"].(map[string]any)
+	if updated["state"] != "处理中" {
+		t.Fatalf("updated=%#v", updated)
+	}
+	if data["recoveryHint"] == nil || data["recoveryHint"] == "" {
+		t.Fatalf("missing recoveryHint: %#v", data)
+	}
+}
+
+func TestPageSizeRejectedAboveMax(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("PINGCODE_API_BASE_URL", "http://127.0.0.1:9")
+	t.Setenv("PINGCODE_BASE_URL", "https://example.pingcode.com")
+	t.Setenv("PINGCODE_CLIENT_ID", "cid")
+	t.Setenv("PINGCODE_CLIENT_SECRET", "csecret")
+	t.Setenv("PINGCODE_AUTH_TOKEN_PATH", filepath.Join(dir, "auth.json"))
+	t.Setenv("PINGCODE_PROJECT_IDENTIFIER", "DEMO")
+
+	var stdout bytes.Buffer
+	result := pingcode.Execute(context.Background(), []string{"work-item", "search", "--page-size", "101"}, pingcode.RuntimeDependencies{
+		Stdout: &stdout,
+	})
+	if result.ExitCode != cli.ExitUsage {
+		t.Fatalf("exit=%d out=%s", result.ExitCode, stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "pageSize") {
+		t.Fatalf("out=%s", stdout.String())
+	}
+}

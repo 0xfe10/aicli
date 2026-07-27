@@ -22,6 +22,7 @@ func TestExitCodeFor(t *testing.T) {
 		"RATE_LIMITED":            cli.ExitRateLimited,
 		"UPSTREAM_TIMEOUT":        cli.ExitUpstreamTimeout,
 		"UPSTREAM_ERROR":          cli.ExitUpstream,
+		"PARTIAL_SUCCESS":         cli.ExitPartialSuccess,
 		"INTERNAL_ERROR":          cli.ExitInternal,
 	}
 	for code, want := range cases {

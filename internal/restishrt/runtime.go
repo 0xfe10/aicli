@@ -16,7 +16,11 @@ import (
 	"github.com/0xfe10/aicli/internal/redact"
 )
 
-const pinnedRestishVersion = "2.3.0"
+const (
+	pinnedRestishVersion = "2.3.0"
+	maxResponseBodyBytes = 8 << 20
+	maxRedirects         = 10
+)
 
 // AuthProvider supplies Authorization headers for raw requests.
 type AuthProvider func(ctx context.Context) (string, error)
@@ -51,10 +55,11 @@ func Version() string {
 	return pinnedRestishVersion
 }
 
-// Run executes pingcode raw <METHOD> <path> [--body JSON].
+// Run executes pingcode raw <METHOD> <path> [--body JSON | --body-stdin].
 // It never writes stdout or stderr; the command layer encodes exactly once.
-func (r *Runtime) Run(ctx context.Context, args []string) (Result, error) {
-	method, path, body, err := parseRawArgs(args)
+// Prefer --body-stdin for payloads that may contain credentials.
+func (r *Runtime) Run(ctx context.Context, args []string, stdin io.Reader) (Result, error) {
+	method, path, body, err := parseRawArgs(args, stdin)
 	if err != nil {
 		return Result{}, rawError("INVALID_ARGUMENT", err.Error())
 	}
@@ -65,10 +70,7 @@ func (r *Runtime) Run(ctx context.Context, args []string) (Result, error) {
 		return Result{}, rawError("INVALID_ARGUMENT", err.Error())
 	}
 
-	client := r.HTTP
-	if client == nil {
-		client = &http.Client{Timeout: 30 * time.Second}
-	}
+	client := r.httpClient()
 
 	var bodyReader io.Reader
 	if body != nil {
@@ -93,15 +95,26 @@ func (r *Runtime) Run(ctx context.Context, args []string) (Result, error) {
 	resp, err := client.Do(req)
 	if err != nil {
 		code := "UPSTREAM_ERROR"
-		if ctx.Err() != nil || strings.Contains(strings.ToLower(err.Error()), "timeout") {
+		msg := err.Error()
+		lower := strings.ToLower(msg)
+		switch {
+		case ctx.Err() != nil || strings.Contains(lower, "timeout"):
 			code = "UPSTREAM_TIMEOUT"
+		case strings.Contains(lower, "cross-origin redirect") || strings.Contains(lower, "跨主机") || strings.Contains(lower, "跨端口"):
+			code = "FORBIDDEN"
 		}
-		return Result{}, rawError(code, err.Error())
+		return Result{}, rawError(code, msg)
 	}
 	defer resp.Body.Close()
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+
+	limited := io.LimitReader(resp.Body, maxResponseBodyBytes+1)
+	respBody, err := io.ReadAll(limited)
 	if err != nil {
 		return Result{}, rawError("UPSTREAM_ERROR", "读取响应失败")
+	}
+	truncated := len(respBody) > maxResponseBodyBytes
+	if truncated {
+		respBody = respBody[:maxResponseBodyBytes]
 	}
 
 	var parsed any
@@ -119,12 +132,14 @@ func (r *Runtime) Run(ctx context.Context, args []string) (Result, error) {
 		"body":    parsed,
 	}
 	meta := map[string]any{
-		"command":         "raw",
-		"method":          method,
-		"url":             redact.String(fullURL),
-		"restish_version": pinnedRestishVersion,
-		"transport":       "controlled-net-http",
-		"restish_role":    "linked-only",
+		"command":            "raw",
+		"method":             method,
+		"url":                redact.String(fullURL),
+		"restish_version":    pinnedRestishVersion,
+		"transport":          "controlled-net-http",
+		"restish_role":       "linked-only",
+		"response_truncated": truncated,
+		"response_bytes_cap": maxResponseBodyBytes,
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		// Keep response data for debugging; command layer still emits one JSON document.
@@ -133,16 +148,64 @@ func (r *Runtime) Run(ctx context.Context, args []string) (Result, error) {
 	return Result{Data: data, Meta: meta}, nil
 }
 
-func parseRawArgs(args []string) (method, path string, body []byte, err error) {
-	if len(args) == 0 {
-		return "", "", nil, fmt.Errorf("usage: pingcode raw <GET|POST|PATCH|DELETE> <path> [--body JSON]")
+func (r *Runtime) httpClient() *http.Client {
+	base := r.HTTP
+	if base == nil {
+		base = &http.Client{Timeout: 30 * time.Second}
 	}
-	// Ignore leading "--" separators.
+	// Shallow copy so we never mutate a caller-owned client.
+	client := *base
+	client.CheckRedirect = secureCheckRedirect
+	return &client
+}
+
+// secureCheckRedirect refuses redirects that change host or port.
+// Go's default policy still forwards Authorization across ports on the same host.
+func secureCheckRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= maxRedirects {
+		return fmt.Errorf("stopped after %d redirects", maxRedirects)
+	}
+	if len(via) == 0 {
+		return nil
+	}
+	origin := via[0].URL
+	if !sameAuthority(origin, req.URL) {
+		return fmt.Errorf("raw 拒绝跟随跨主机或跨端口重定向（%s -> %s）", authority(origin), authority(req.URL))
+	}
+	return nil
+}
+
+func sameAuthority(a, b *url.URL) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	return authority(a) == authority(b)
+}
+
+func authority(u *url.URL) string {
+	host := strings.ToLower(u.Hostname())
+	port := u.Port()
+	if port == "" {
+		switch u.Scheme {
+		case "https":
+			port = "443"
+		case "http":
+			port = "80"
+		}
+	}
+	return host + ":" + port
+}
+
+func parseRawArgs(args []string, stdin io.Reader) (method, path string, body []byte, err error) {
+	usage := "usage: pingcode raw <GET|POST|PATCH|DELETE> <path> [--body JSON | --body-stdin]"
+	if len(args) == 0 {
+		return "", "", nil, fmt.Errorf("%s", usage)
+	}
 	for len(args) > 0 && args[0] == "--" {
 		args = args[1:]
 	}
 	if len(args) < 2 {
-		return "", "", nil, fmt.Errorf("usage: pingcode raw <GET|POST|PATCH|DELETE> <path> [--body JSON]")
+		return "", "", nil, fmt.Errorf("%s", usage)
 	}
 	method = strings.ToUpper(args[0])
 	switch method {
@@ -152,9 +215,13 @@ func parseRawArgs(args []string) (method, path string, body []byte, err error) {
 	}
 	path = args[1]
 	rest := args[2:]
+	var bodyFromArg, bodyFromStdin bool
 	for i := 0; i < len(rest); i++ {
 		switch rest[i] {
 		case "--body":
+			if bodyFromStdin {
+				return "", "", nil, fmt.Errorf("--body 与 --body-stdin 不能同时使用")
+			}
 			if i+1 >= len(rest) {
 				return "", "", nil, fmt.Errorf("--body 需要 JSON 参数")
 			}
@@ -163,13 +230,34 @@ func parseRawArgs(args []string) (method, path string, body []byte, err error) {
 				return "", "", nil, fmt.Errorf("--body 必须是合法 JSON")
 			}
 			body = raw
+			bodyFromArg = true
 			i++
+		case "--body-stdin":
+			if bodyFromArg {
+				return "", "", nil, fmt.Errorf("--body 与 --body-stdin 不能同时使用")
+			}
+			if stdin == nil {
+				return "", "", nil, fmt.Errorf("--body-stdin 需要可读的 stdin")
+			}
+			raw, readErr := io.ReadAll(io.LimitReader(stdin, maxResponseBodyBytes))
+			if readErr != nil {
+				return "", "", nil, fmt.Errorf("读取 stdin 失败: %w", readErr)
+			}
+			raw = bytes.TrimSpace(raw)
+			if len(raw) == 0 {
+				return "", "", nil, fmt.Errorf("--body-stdin JSON 为空")
+			}
+			if !json.Valid(raw) {
+				return "", "", nil, fmt.Errorf("--body-stdin 必须是合法 JSON")
+			}
+			body = raw
+			bodyFromStdin = true
 		default:
 			return "", "", nil, fmt.Errorf("未知参数: %s", rest[i])
 		}
 	}
 	if body != nil && (method == http.MethodGet || method == http.MethodHead || method == http.MethodDelete) {
-		return "", "", nil, fmt.Errorf("%s 不支持 --body", method)
+		return "", "", nil, fmt.Errorf("%s 不支持请求体", method)
 	}
 	return method, path, body, nil
 }

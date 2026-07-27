@@ -7,3 +7,5 @@ dist/
 *.test
 coverage.out
 *.sha256
+/pingcode
+/pingcode.exe

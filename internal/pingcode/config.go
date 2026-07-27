@@ -68,6 +68,9 @@ func LoadConfig() (Config, error) {
 	if err := validateAPIBaseURL(cfg.APIBaseURL); err != nil {
 		return Config{}, err
 	}
+	if cfg.TimeoutMS < 1000 || cfg.TimeoutMS > 120000 {
+		return Config{}, NewError(CodeConfigMissing, "PINGCODE_TIMEOUT_MS 取值范围是 1000 到 120000")
+	}
 	return cfg, nil
 }
 

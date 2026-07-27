@@ -29,7 +29,7 @@ type RuntimeDependencies struct {
 	Stderr  io.Writer
 	Stdin   io.Reader
 	Version VersionInfo
-	Raw     func(ctx context.Context, args []string) (RawResult, error)
+	Raw     func(ctx context.Context, args []string, stdin io.Reader) (RawResult, error)
 }
 
 // RawResult is returned by the transport layer and encoded once by Execute.
@@ -95,7 +95,7 @@ func Execute(ctx context.Context, args []string, deps RuntimeDependencies) Resul
 		if deps.Raw == nil {
 			return writeErr(deps.Stdout, NewError(CodeInternalError, "raw transport 未初始化"))
 		}
-		result, err := deps.Raw(ctx, rest)
+		result, err := deps.Raw(ctx, rest, deps.Stdin)
 		if err != nil {
 			return writeRawFailure(deps.Stdout, result, err)
 		}
@@ -421,7 +421,14 @@ func writeOK(w io.Writer, data any, meta any) Result {
 func writeErr(w io.Writer, err error) Result {
 	pe := Classify(err)
 	msg := Redact(pe.Message)
-	_ = cli.WriteError(w, pe.Code, msg)
+	_ = cli.WriteJSON(w, cli.Response{
+		OK:   false,
+		Data: pe.Data,
+		Error: &cli.ErrorBody{
+			Code:    pe.Code,
+			Message: msg,
+		},
+	})
 	return Result{ExitCode: cli.ExitCodeFor(pe.Code)}
 }
 
@@ -623,10 +630,12 @@ Controlled HTTP escape hatch for PingCode API debugging.
 Restish is linked into the binary for version/compliance only; requests use net/http.
 
 Usage:
-  pingcode raw <GET|POST|PATCH|PUT|DELETE|HEAD> <path> [--body JSON]
+  pingcode raw <GET|POST|PATCH|PUT|DELETE|HEAD> <path> [--body JSON | --body-stdin]
 
 Path must be a relative API path such as /v1/project/projects.
-Stdout is always exactly one JSON document.
+Prefer --body-stdin for payloads that may contain credentials (avoids argv/history).
+Cross-host and cross-port redirects are refused.
+Stdout is always exactly one JSON document; secrets in bodies/headers are redacted.
 `
 }
 

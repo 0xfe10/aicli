@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/signal"
 	"runtime"
@@ -13,7 +14,7 @@ import (
 
 // Set by -ldflags at release build time.
 var (
-	version = "0.1.3"
+	version = "0.1.4"
 	commit  = "unknown"
 )
 
@@ -37,8 +38,8 @@ func main() {
 			APIBaseURL: cfg.APIBaseURL,
 			Auth:       client.AuthorizationHeader,
 		}
-		deps.Raw = func(ctx context.Context, args []string) (pingcode.RawResult, error) {
-			result, err := raw.Run(ctx, args)
+		deps.Raw = func(ctx context.Context, args []string, stdin io.Reader) (pingcode.RawResult, error) {
+			result, err := raw.Run(ctx, args, stdin)
 			return pingcode.RawResult{Data: result.Data, Meta: result.Meta}, err
 		}
 	}

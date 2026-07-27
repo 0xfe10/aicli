@@ -13,6 +13,7 @@ const (
 	ExitUpstreamTimeout = 71
 	ExitUpstream        = 72
 	ExitInternal        = 73
+	ExitPartialSuccess  = 75
 )
 
 // ExitCodeFor maps a stable error code to a process exit status.
@@ -38,6 +39,8 @@ func ExitCodeFor(code string) int {
 		return ExitUpstreamTimeout
 	case "UPSTREAM_ERROR":
 		return ExitUpstream
+	case "PARTIAL_SUCCESS":
+		return ExitPartialSuccess
 	default:
 		return ExitInternal
 	}

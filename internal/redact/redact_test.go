@@ -41,15 +41,38 @@ func TestHeaderValue(t *testing.T) {
 	}
 }
 
+func TestNormalizeKeyVariants(t *testing.T) {
+	cases := []string{"access_token", "accessToken", "Access-Token", "ACCESS_TOKEN", "access-token"}
+	for _, k := range cases {
+		if !redact.IsSensitiveKey(k) {
+			t.Fatalf("%q should be sensitive", k)
+		}
+	}
+	for _, k := range []string{"code", "message", "title", "identifier", "state"} {
+		if redact.IsSensitiveKey(k) {
+			t.Fatalf("%q should not be sensitive", k)
+		}
+	}
+	for _, k := range []string{"authorizationCode", "auth_code", "clientSecret", "refreshToken", "token", "secret"} {
+		if !redact.IsSensitiveKey(k) {
+			t.Fatalf("%q should be sensitive", k)
+		}
+	}
+}
+
 func TestValueRedactsNestedJSONSecrets(t *testing.T) {
 	raw := map[string]any{
-		"access_token": "tok-live-secret",
+		"accessToken": "tok-live-secret",
 		"nested": map[string]any{
-			"Authorization": "Bearer echo-secret",
-			"title":         "keep-me",
+			"Authorization":     "Bearer echo-secret",
+			"authorizationCode": "auth-code-secret",
+			"client_secret":     "client-secret-value",
+			"refresh-token":     "refresh-secret",
+			"title":             "keep-me",
+			"code":              "100009",
 		},
 		"items": []any{
-			map[string]any{"refresh_token": "refresh-secret", "id": "1"},
+			map[string]any{"refreshToken": "refresh-secret-2", "id": "1"},
 		},
 		"note": "Bearer freeform-secret",
 	}
@@ -62,7 +85,10 @@ func TestValueRedactsNestedJSONSecrets(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(encoded)
-	for _, secret := range []string{"tok-live-secret", "echo-secret", "refresh-secret", "freeform-secret"} {
+	for _, secret := range []string{
+		"tok-live-secret", "echo-secret", "auth-code-secret",
+		"client-secret-value", "refresh-secret", "refresh-secret-2", "freeform-secret",
+	} {
 		if strings.Contains(text, secret) {
 			t.Fatalf("secret %q leaked in %s", secret, text)
 		}
@@ -70,5 +96,8 @@ func TestValueRedactsNestedJSONSecrets(t *testing.T) {
 	nested := out["nested"].(map[string]any)
 	if nested["title"] != "keep-me" {
 		t.Fatalf("business field lost: %#v", nested)
+	}
+	if nested["code"] != "100009" {
+		t.Fatalf("business code over-redacted: %#v", nested["code"])
 	}
 }

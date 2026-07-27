@@ -35,11 +35,17 @@ func (s *Service) GetSchema(ctx context.Context, kind *WorkItemKind, projectIden
 	if err != nil {
 		return nil, err
 	}
-	typesPage, err := s.client.ListWorkItemTypes(ctx, project.ID, 0, 100)
+	types, err := listAllPages(ctx, "work_item_types", func(pageIndex, pageSize int) (int, []WorkItemType, error) {
+		page, err := s.client.ListWorkItemTypes(ctx, project.ID, pageIndex, pageSize)
+		return page.Total, page.Values, err
+	})
 	if err != nil {
 		return nil, err
 	}
-	prioritiesPage, err := s.client.ListWorkItemPriorities(ctx, project.ID, 0, 100)
+	priorities, err := listAllPages(ctx, "work_item_priorities", func(pageIndex, pageSize int) (int, []WorkItemPriority, error) {
+		page, err := s.client.ListWorkItemPriorities(ctx, project.ID, pageIndex, pageSize)
+		return page.Total, page.Values, err
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -50,27 +56,30 @@ func (s *Service) GetSchema(ctx context.Context, kind *WorkItemKind, projectIden
 	if kind == nil {
 		return map[string]any{
 			"project":    project,
-			"types":      typesPage.Values,
-			"priorities": prioritiesPage.Values,
+			"types":      types,
+			"priorities": priorities,
 			"members":    members,
 		}, nil
 	}
-	typ, err := s.resolveType(typesPage.Values, *kind, typeID)
+	typ, err := s.resolveType(types, *kind, typeID)
 	if err != nil {
 		return nil, err
 	}
-	statesPage, err := s.client.ListWorkItemStates(ctx, project.ID, typ.ID, 0, 100)
+	states, err := listAllPages(ctx, "work_item_states", func(pageIndex, pageSize int) (int, []WorkItemState, error) {
+		page, err := s.client.ListWorkItemStates(ctx, project.ID, typ.ID, pageIndex, pageSize)
+		return page.Total, page.Values, err
+	})
 	if err != nil {
 		return nil, err
 	}
 	flows := []map[string]any{}
 	if plans, planErr := s.client.GetWorkItemStatePlans(ctx, project.ID); planErr == nil {
-		if plan := findStatePlan(plans, project, typ); plan != nil && len(statesPage.Values) > 0 {
-			for _, st := range statesPage.Values {
+		if plan := findStatePlan(plans, project, typ); plan != nil && len(states) > 0 {
+			for _, st := range states {
 				if edges, flowErr := s.client.GetWorkItemStateFlows(ctx, plan.ID, st.ID); flowErr == nil {
 					flows = append(flows, map[string]any{
 						"fromState": map[string]any{"id": st.ID, "name": st.Name},
-						"to":        summarizeFlows(edges, statesPage.Values),
+						"to":        summarizeFlows(edges, states),
 					})
 				}
 			}
@@ -79,9 +88,9 @@ func (s *Service) GetSchema(ctx context.Context, kind *WorkItemKind, projectIden
 	return map[string]any{
 		"project":          project,
 		"type":             typ,
-		"types":            typesPage.Values,
-		"states":           statesPage.Values,
-		"priorities":       prioritiesPage.Values,
+		"types":            types,
+		"states":           states,
+		"priorities":       priorities,
 		"members":          members,
 		"stateTransitions": flows,
 	}, nil
@@ -89,6 +98,10 @@ func (s *Service) GetSchema(ctx context.Context, kind *WorkItemKind, projectIden
 
 // ListProjects lists projects with optional identifier filter.
 func (s *Service) ListProjects(ctx context.Context, identifier string, pageIndex, pageSize int) (PageResponse[Project], error) {
+	pageIndex, pageSize, err := normalizePageBounds(pageIndex, pageSize)
+	if err != nil {
+		return PageResponse[Project]{}, err
+	}
 	return s.client.ListProjects(ctx, identifier, pageIndex, pageSize)
 }
 
@@ -493,14 +506,22 @@ func (s *Service) TransitionWorkItem(ctx context.Context, in TransitionInput, ap
 		toStateID = st.ID
 		toStatus = st.Name
 	} else {
+		found := false
 		for _, st := range schema.States {
 			if st.ID == toStateID {
 				toStatus = st.Name
+				found = true
 				break
 			}
 		}
+		if !found {
+			return nil, NewError(CodeInvalidInput, "stateId 不属于当前工作项类型的可用状态")
+		}
 	}
 	workflow, _ := s.resolveLegalTransitions(ctx, schema, refID(item.State), toStateID)
+	if allowed, ok := workflow["transitionAllowed"].(bool); ok && !allowed {
+		return nil, NewError(CodeInvalidInput, "当前状态不允许转换到目标状态")
+	}
 	plan := map[string]any{
 		"target":               summarizeWorkItem(item, s.cfg.BaseURL),
 		"currentStatus":        refName(item.State),
@@ -539,11 +560,16 @@ func (s *Service) TransitionWorkItem(ctx context.Context, in TransitionInput, ap
 		return nil, err
 	}
 	out["updated"] = summarizeWorkItem(updated, s.cfg.BaseURL)
+	out["commentApplied"] = false
 	if in.Comment != "" {
 		comment, err := s.client.CreateWorkItemComment(ctx, updated.ID, in.Comment)
 		if err != nil {
-			return nil, err
+			out["commentApplied"] = false
+			out["commentError"] = Redact(err.Error())
+			out["recoveryHint"] = "状态已更新；评论未写入。请用 work-item comment 单独补写，勿重复 transition。"
+			return nil, NewErrorWithData(CodePartialSuccess, "状态已更新，但评论写入失败", out)
 		}
+		out["commentApplied"] = true
 		out["comment"] = comment
 	}
 	return out, nil
@@ -608,6 +634,10 @@ type listOptions struct {
 }
 
 func (s *Service) list(ctx context.Context, kind WorkItemKind, opt listOptions) (PageResponse[WorkItem], error) {
+	pageIndex, pageSize, err := normalizePageBounds(opt.PageIndex, opt.PageSize)
+	if err != nil {
+		return PageResponse[WorkItem]{}, err
+	}
 	schema, err := s.getKindSchema(ctx, kind, opt.ProjectIdentifier, opt.ProjectID, "")
 	if err != nil {
 		return PageResponse[WorkItem]{}, err
@@ -623,11 +653,6 @@ func (s *Service) list(ctx context.Context, kind WorkItemKind, opt listOptions) 
 	assigneeIDs, err := s.memberNamesToIDs(opt.AssigneeNames, schema.Members)
 	if err != nil {
 		return PageResponse[WorkItem]{}, err
-	}
-	pageIndex := opt.PageIndex
-	pageSize := opt.PageSize
-	if pageSize <= 0 {
-		pageSize = 30
 	}
 	return s.client.ListWorkItems(ctx, WorkItemListQuery{
 		ProjectIDs:     joinCap([]string{schema.Project.ID}),
@@ -647,19 +672,28 @@ func (s *Service) getKindSchema(ctx context.Context, kind WorkItemKind, projectI
 	if err != nil {
 		return SchemaContext{}, err
 	}
-	typesPage, err := s.client.ListWorkItemTypes(ctx, project.ID, 0, 100)
+	types, err := listAllPages(ctx, "work_item_types", func(pageIndex, pageSize int) (int, []WorkItemType, error) {
+		page, err := s.client.ListWorkItemTypes(ctx, project.ID, pageIndex, pageSize)
+		return page.Total, page.Values, err
+	})
 	if err != nil {
 		return SchemaContext{}, err
 	}
-	typ, err := s.resolveType(typesPage.Values, kind, typeID)
+	typ, err := s.resolveType(types, kind, typeID)
 	if err != nil {
 		return SchemaContext{}, err
 	}
-	statesPage, err := s.client.ListWorkItemStates(ctx, project.ID, typ.ID, 0, 100)
+	states, err := listAllPages(ctx, "work_item_states", func(pageIndex, pageSize int) (int, []WorkItemState, error) {
+		page, err := s.client.ListWorkItemStates(ctx, project.ID, typ.ID, pageIndex, pageSize)
+		return page.Total, page.Values, err
+	})
 	if err != nil {
 		return SchemaContext{}, err
 	}
-	prioritiesPage, err := s.client.ListWorkItemPriorities(ctx, project.ID, 0, 100)
+	priorities, err := listAllPages(ctx, "work_item_priorities", func(pageIndex, pageSize int) (int, []WorkItemPriority, error) {
+		page, err := s.client.ListWorkItemPriorities(ctx, project.ID, pageIndex, pageSize)
+		return page.Total, page.Values, err
+	})
 	if err != nil {
 		return SchemaContext{}, err
 	}
@@ -670,34 +704,100 @@ func (s *Service) getKindSchema(ctx context.Context, kind WorkItemKind, projectI
 	return SchemaContext{
 		Project:    project,
 		Type:       typ,
-		Types:      typesPage.Values,
-		States:     statesPage.Values,
-		Priorities: prioritiesPage.Values,
+		Types:      types,
+		States:     states,
+		Priorities: priorities,
 		Members:    members,
 	}, nil
 }
 
 func (s *Service) listAllProjectMembers(ctx context.Context, projectID string) ([]ProjectMember, error) {
-	const pageSize = 100
-	const maxPages = 100
-	var all []ProjectMember
-	for pageIndex := 0; pageIndex < maxPages; pageIndex++ {
+	return listAllPages(ctx, "project_members", func(pageIndex, pageSize int) (int, []ProjectMember, error) {
 		page, err := s.client.ListProjectMembers(ctx, projectID, pageIndex, pageSize)
+		return page.Total, page.Values, err
+	})
+}
+
+const (
+	defaultDiscoveryPageSize = 100
+	defaultUserPageSize      = 30
+	maxPageSize              = 100
+	maxListPages             = 100
+)
+
+func normalizePageBounds(pageIndex, pageSize int) (int, int, error) {
+	if pageIndex < 0 {
+		return 0, 0, NewError(CodeInvalidArgument, "pageIndex 必须 >= 0")
+	}
+	if pageSize < 0 {
+		return 0, 0, NewError(CodeInvalidArgument, "pageSize 必须 >= 0")
+	}
+	if pageSize == 0 {
+		pageSize = defaultUserPageSize
+	}
+	if pageSize > maxPageSize {
+		return 0, 0, NewError(CodeInvalidArgument, fmt.Sprintf("pageSize 取值范围是 1 到 %d", maxPageSize))
+	}
+	return pageIndex, pageSize, nil
+}
+
+type pageFetcher[T any] func(pageIndex, pageSize int) (total int, values []T, err error)
+
+func listAllPages[T any](ctx context.Context, resource string, fetch pageFetcher[T]) ([]T, error) {
+	var all []T
+	seen := map[string]struct{}{}
+	for pageIndex := 0; pageIndex < maxListPages; pageIndex++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		total, values, err := fetch(pageIndex, defaultDiscoveryPageSize)
 		if err != nil {
 			return nil, err
 		}
-		all = append(all, page.Values...)
-		if len(page.Values) == 0 {
-			break
+		for _, v := range values {
+			id := entityID(v)
+			if id != "" {
+				if _, ok := seen[id]; ok {
+					continue
+				}
+				seen[id] = struct{}{}
+			}
+			all = append(all, v)
 		}
-		if page.Total > 0 && len(all) >= page.Total {
-			break
+		if len(values) == 0 {
+			return all, nil
 		}
-		if len(page.Values) < pageSize {
-			break
+		if total > 0 && len(all) >= total {
+			return all, nil
+		}
+		if len(values) < defaultDiscoveryPageSize {
+			return all, nil
 		}
 	}
-	return all, nil
+	return nil, NewError(CodeUpstreamError, fmt.Sprintf("%s 超过最大分页上限 %d 页（page_size=%d），结果可能不完整", resource, maxListPages, defaultDiscoveryPageSize))
+}
+
+func entityID(v any) string {
+	switch typed := any(v).(type) {
+	case ProjectMember:
+		if typed.ID != "" {
+			return typed.ID
+		}
+		if typed.User != nil {
+			return typed.User.ID
+		}
+	case WorkItemType:
+		return typed.ID
+	case WorkItemState:
+		return typed.ID
+	case WorkItemPriority:
+		return typed.ID
+	case WorkItem:
+		return typed.ID
+	case Comment:
+		return typed.ID
+	}
+	return ""
 }
 
 func (s *Service) resolveCurrentAssigneeName(ctx context.Context, override string) (string, error) {

@@ -1,6 +1,6 @@
 # PingCode shadow validation gate
 
-Status: **v0.1.2 accepted for core domain commands; raw credential redaction patched for v0.1.3**
+Status: **v0.1.4 in progress — M1/M2 security+write/pagination fixes landed; full E2E apply/MCP oracle still gated**
 
 This gate is required before release. Do not publish until both route families
 and controlled writes succeed against a real tenant.
@@ -107,10 +107,12 @@ Real-tenant defects found and fixed during validation:
 
 Remaining release-gate checks:
 
-- Publish `v0.1.2`, download the release artifact, and re-run this matrix on the
-  artifact (not a local `go build`).
-- Controlled `--apply` vs MCP write comparison.
-- Manually confirm `CS-1` in the PingCode UI.
+- Download `v0.1.4` Release artifact and run `just pingcode-release-verify` /
+  `pingcode-shadow-*` against it.
+- Provide dedicated test project with members, requirement type, and OAuth user.
+- Pin MCP oracle image digest/commit; fix or bypass `get_work_item` timestamp schema.
+- Controlled `--apply` twin-ticket compare with runId lifecycle (no blind retries).
+- Manually confirm disposable items in the PingCode UI.
 
 ## 2026-07-27 MCP parity (kahub PingCode tools)
 
@@ -138,5 +140,17 @@ Notes:
   `services/pingcode/commands.yaml`.
 - MCP `get_work_item` currently fails LiteLLM/output schema validation because
   PingCode returns numeric epoch fields; CLI correctly accepts them.
-- Next gate: commit these fixes, publish `v0.1.2`, download the release artifact,
-  re-run this matrix, then do controlled `--apply` vs MCP write comparison.
+
+## 2026-07-27 M1/M2 hardening (for v0.1.4)
+
+Code-level gates landed before the next Release artifact:
+
+- `raw` sensitive-key normalization (case / `_` / `-`), camelCase coverage,
+  `--body-stdin`, cross-host/port redirect refusal, response truncation metadata.
+- Transition + comment failure returns `PARTIAL_SUCCESS` with `updated`,
+  `commentApplied:false`, and a recovery hint.
+- Discovery lists (members/types/states/priorities) use shared pagination with
+  ID dedupe and an explicit error at the max page ceiling.
+- Local `pageIndex`/`pageSize`/`PINGCODE_TIMEOUT_MS` bounds checks.
+- Justfile recipes: `pingcode-shadow-preflight|read|dry-run|apply`,
+  `pingcode-release-verify` (apply requires `PINGCODE_E2E_APPLY=1`).

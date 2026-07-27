@@ -3,29 +3,35 @@ package redact
 import (
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 var (
 	bearerPattern      = regexp.MustCompile(`(?i)Bearer\s+\S+`)
-	secretKVPattern    = regexp.MustCompile(`(?i)("?(access_token|refresh_token|client_secret|client_id|token|secret|code|password|api[_-]?key)"?\s*[:=]\s*"?)[^"&\s,}]+`)
+	secretKVPattern    = regexp.MustCompile(`(?i)("?(access[_-]?token|refresh[_-]?token|client[_-]?secret|client[_-]?id|authorization[_-]?code|auth[_-]?code|authorization|password|api[_-]?key|token|secret|code)"?\s*[:=]\s*"?)[^"&\s,}]+`)
 	authHeaderPattern  = regexp.MustCompile(`(?i)(Authorization\s*:\s*)\S+(?:\s+\S+)?`)
-	querySecretPattern = regexp.MustCompile(`(?i)(access_token|refresh_token|client_secret|client_id|token|secret|code|authorization|password|api[_-]?key)=[^&\s]+`)
+	querySecretPattern = regexp.MustCompile(`(?i)(access[_-]?token|refresh[_-]?token|client[_-]?secret|client[_-]?id|authorization[_-]?code|auth[_-]?code|authorization|password|api[_-]?key|token|secret|code)=[^&\s]+`)
 )
 
-var sensitiveKeys = map[string]struct{}{
-	"access_token":        {},
-	"refresh_token":       {},
-	"client_secret":       {},
-	"client_id":           {},
-	"authorization":       {},
-	"password":            {},
-	"api_key":             {},
-	"apikey":              {},
-	"api-key":             {},
-	"cookie":              {},
-	"set-cookie":          {},
-	"set_cookie":          {},
-	"proxy-authorization": {},
+// Keys are stored in normalized form: lowercase with '_' and '-' removed.
+// Bare "code" is intentionally excluded so PingCode business error codes survive.
+var sensitiveNormalizedKeys = map[string]struct{}{
+	"accesstoken":        {},
+	"refreshtoken":       {},
+	"clientsecret":       {},
+	"clientid":           {},
+	"authorization":      {},
+	"authorizationcode":  {},
+	"authcode":           {},
+	"password":           {},
+	"apikey":             {},
+	"cookie":             {},
+	"setcookie":          {},
+	"proxyauthorization": {},
+	"token":              {},
+	"secret":             {},
+	"idtoken":            {},
+	"sessiontoken":       {},
 }
 
 // String removes common credential material from free-form text.
@@ -58,7 +64,7 @@ func Value(v any) any {
 	case map[string]any:
 		out := make(map[string]any, len(typed))
 		for k, child := range typed {
-			if isSensitiveKey(k) {
+			if IsSensitiveKey(k) {
 				out[k] = "***"
 				continue
 			}
@@ -78,7 +84,23 @@ func Value(v any) any {
 	}
 }
 
-func isSensitiveKey(name string) bool {
-	_, ok := sensitiveKeys[strings.ToLower(strings.TrimSpace(name))]
+// IsSensitiveKey reports whether a JSON object key should be fully masked.
+// Matching ignores case and '_' / '-' so accessToken, access_token, and
+// access-token are treated the same. Bare "code" is not sensitive.
+func IsSensitiveKey(name string) bool {
+	_, ok := sensitiveNormalizedKeys[NormalizeKey(name)]
 	return ok
+}
+
+// NormalizeKey lowercases and strips '_' / '-' for credential key matching.
+func NormalizeKey(name string) string {
+	var b strings.Builder
+	b.Grow(len(name))
+	for _, r := range strings.TrimSpace(name) {
+		if r == '_' || r == '-' {
+			continue
+		}
+		b.WriteRune(unicode.ToLower(r))
+	}
+	return b.String()
 }
