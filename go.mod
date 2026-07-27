@@ -3,10 +3,12 @@ module github.com/0xfe10/aicli
 go 1.25.3
 
 require (
+	github.com/getkin/kin-openapi v0.145.0
 	github.com/pb33f/libopenapi v0.35.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/rest-sh/restish/v2 v2.3.0
 	golang.org/x/term v0.43.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -30,6 +32,8 @@ require (
 	github.com/danielgtaylor/shorthand/v2 v2.4.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
+	github.com/go-openapi/jsonpointer v0.22.5 // indirect
+	github.com/go-openapi/swag/jsonname v0.25.5 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/hexops/gotextdiff v1.0.3 // indirect
@@ -42,6 +46,8 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
+	github.com/oasdiff/yaml v0.1.1 // indirect
+	github.com/oasdiff/yaml3 v0.0.14 // indirect
 	github.com/pb33f/jsonpath v0.8.2 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

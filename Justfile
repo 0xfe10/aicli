@@ -30,9 +30,24 @@ pingcode-spec-check:
     PINGCODE_API_DATA_FILE="$spec_file" \
       go test -run TestOfficialAPIDocFile -v ./internal/pingcodert
 
+test:
+    go test ./...
+
+test-fns:
+    go test ./internal/swagger2rt ./internal/fnsrt ./cmd/fns
+
+build-fns: _validate-version
+    @just _build-fns linux amd64
+    @just _build-fns linux arm64
+
+verify-fns: test-fns
+    @just build-fns
+
 build-pingcode: _validate-version
     @just _build-pingcode linux amd64
     @just _build-pingcode linux arm64
+
+build: build-pingcode build-fns
 
 release-build: _validate-version
     @just build-archive aicli linux amd64
@@ -47,6 +62,12 @@ release-build: _validate-version
     @just build-archive pingcode darwin arm64
     @just build-archive pingcode windows amd64
     @just build-archive pingcode windows arm64
+    @just build-archive fns linux amd64
+    @just build-archive fns linux arm64
+    @just build-archive fns darwin amd64
+    @just build-archive fns darwin arm64
+    @just build-archive fns windows amd64
+    @just build-archive fns windows arm64
     @just release-checksums
     @echo "release artifacts in {{ out_dir }}"
     @ls -lh "{{ out_dir }}"
@@ -59,8 +80,8 @@ release-checksums: _validate-version
     set -euo pipefail
     cd "{{ out_dir }}"
     archive_count="$(find . -maxdepth 1 -type f \( -name '*_{{ version }}_*.tar.gz' -o -name '*_{{ version }}_*.zip' \) | wc -l)"
-    if [[ "$archive_count" -ne 12 ]]; then
-      echo "expected 12 release archives, found ${archive_count}" >&2
+    if [[ "$archive_count" -ne 18 ]]; then
+      echo "expected 18 release archives, found ${archive_count}" >&2
       exit 1
     fi
     sha256sum ./*_"{{ version }}"_*.tar.gz ./*_"{{ version }}"_*.zip > checksums.txt
@@ -83,6 +104,21 @@ _build-pingcode goos goarch:
       sha256sum "${name}" > "${name}.sha256"
     )
 
+_build-fns goos goarch:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p "{{ out_dir }}"
+    name="fns-{{ version }}-{{ goos }}-{{ goarch }}"
+    echo "building ${name}"
+    CGO_ENABLED=0 GOOS="{{ goos }}" GOARCH="{{ goarch }}" \
+      go build -trimpath -buildvcs=false \
+      -ldflags "-s -w -buildid= -X main.version={{ version }} -X main.commit={{ commit }}" \
+      -o "{{ out_dir }}/${name}" ./cmd/fns
+    (
+      cd "{{ out_dir }}"
+      sha256sum "${name}" > "${name}.sha256"
+    )
+
 _build-archive command goos goarch:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -98,7 +134,7 @@ _build-archive command goos goarch:
     if [[ "$goos" == "windows" ]]; then
       binary="${binary}.exe"
     fi
-    if [[ "$command" == "pingcode" ]]; then
+    if [[ "$command" == "pingcode" || "$command" == "fns" ]]; then
       ldflags+=" -X main.version={{ version }} -X main.commit={{ commit }}"
     fi
 

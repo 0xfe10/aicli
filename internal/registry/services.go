@@ -15,5 +15,11 @@ func Services() []Service {
 			Status:  "active",
 			Command: "pingcode",
 		},
+		{
+			ID:      "fns",
+			Name:    "Fast Note Sync",
+			Status:  "active",
+			Command: "fns",
+		},
 	}
 }

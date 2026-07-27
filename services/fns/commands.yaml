@@ -1,0 +1,36 @@
+surface:
+  source: https://obsidian-fns.kahub.in/openapi.yaml
+  generation: runtime
+  layout: tags
+  naming: restish-method-and-path-fallback
+  coverage: note-file-folder-first-release
+  excluded:
+    - Vault, Admin, Auth, Share, Backup, Storage, and WebGUI routes
+    - duplicate required token header parameters after Bearer conversion
+support_commands:
+  namespace: fns cli
+  auth:
+    - auth login --mode token
+    - auth status
+    - auth logout
+examples:
+  - name: fns auth login --mode token
+    mode: setup
+  - name: fns note get-api-note Notes/test.md genesis
+    mode: read
+  - name: fns file get-api-file assets/test.png genesis
+    mode: read
+  - name: fns note post-api-note
+    mode: write
+  - name: fns file post-api-file 'vault: genesis, path: assets/test.bin, file: @./test.bin'
+    mode: write
+write_policy:
+  environment: FNS_WRITE_MODE
+  default: readonly
+  write: permits POST, PUT, PATCH
+  destructive: also permits DELETE (including recycle-clear)
+output:
+  owner: restish
+  formats: [auto, json, yaml, table, csv, tsv, markdown, raw]
+  filtering: restish
+  pagination: restish

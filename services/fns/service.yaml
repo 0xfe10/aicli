@@ -1,0 +1,36 @@
+id: fns
+name: Fast Note Sync
+status: active
+implementation:
+  type: go-command
+  repository: https://github.com/0xfe10/aicli
+  package: ./cmd/fns
+  command: fns
+  transport: embedded-restish-v2.3.0
+  api_description: https://obsidian-fns.kahub.in/openapi.yaml
+  api_description_format: swagger-2.0
+authentication:
+  supported:
+    - access-token
+  default: access-token
+  local_commands:
+    - auth login --mode token
+    - auth status
+    - auth logout
+  config_path: $XDG_CONFIG_HOME/aicli/fns/config.toml
+  environment_override: true
+safety:
+  write_mode_default: readonly
+  write_modes:
+    readonly: [GET, HEAD, OPTIONS]
+    write: [GET, HEAD, OPTIONS, POST, PUT, PATCH]
+    destructive: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]
+notes:
+  - Restish generates Note/File/Folder commands from the remote Swagger description.
+  - swagger2rt converts Swagger 2 to OpenAPI 3; fnsrt applies FNS-specific contract fixes.
+  - First release hides Vault, Admin, Auth, Share, Backup, Storage, and WebGUI routes.
+  - Tokens are created in FNS WebGUI with permissions such as p:rest c:aicli f:note_rw,file_rw.
+openwiki:
+  overview: openwiki/architecture/cli-platform.md
+  contract: openwiki/decisions/service-cli-contract.md
+  fns: openwiki/architecture/fns-cli.md

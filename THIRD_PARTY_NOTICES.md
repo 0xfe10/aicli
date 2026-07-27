@@ -1,7 +1,7 @@
 # Third-party notices
 
-This file records licenses for third-party code linked into `pingcode`
-and `aicli` release binaries.
+This file records licenses for third-party code linked into `pingcode`,
+`fns`, and `aicli` release binaries.
 
 Evidence is maintained under `openwiki/compliance/`:
 
@@ -14,6 +14,7 @@ Evidence is maintained under `openwiki/compliance/`:
 ## Summary
 
 - Direct dependency: Restish `v2.3.0` (MIT)
+- Direct dependency for FNS Swagger conversion: `github.com/getkin/kin-openapi` (MIT)
 - Linked transitive modules for `./cmd/pingcode`: see inventory (currently 54)
 - No GPLv3 detected in LICENSE scan of the linked closure
 - Apache-2.0 modules are present (for example `amazon-ion/ion-go`); include their NOTICE files from `openwiki/compliance/notices/` with release artifacts when shipping binaries

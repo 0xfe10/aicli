@@ -90,6 +90,7 @@ jobs:
         command:
           - aicli
           - pingcode
+          - fns
         goos:
           - linux
           - darwin
