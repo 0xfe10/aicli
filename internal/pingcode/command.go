@@ -29,7 +29,13 @@ type RuntimeDependencies struct {
 	Stderr  io.Writer
 	Stdin   io.Reader
 	Version VersionInfo
-	Raw     func(ctx context.Context, args []string) error
+	Raw     func(ctx context.Context, args []string) (RawResult, error)
+}
+
+// RawResult is returned by the transport layer and encoded once by Execute.
+type RawResult struct {
+	Data any
+	Meta any
 }
 
 // Result is the command execution outcome.
@@ -48,7 +54,7 @@ func Execute(ctx context.Context, args []string, deps RuntimeDependencies) Resul
 	if deps.Stdin == nil {
 		deps.Stdin = os.Stdin
 	}
-	if len(args) == 0 || hasHelp(args) {
+	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
 		fmt.Fprint(deps.Stdout, helpText())
 		return Result{ExitCode: cli.ExitOK}
 	}
@@ -81,13 +87,18 @@ func Execute(ctx context.Context, args []string, deps RuntimeDependencies) Resul
 	case "work-item":
 		return runWorkItem(ctx, rest, svc, deps)
 	case "raw":
+		if hasHelp(rest) {
+			fmt.Fprint(deps.Stdout, rawHelpText())
+			return Result{ExitCode: cli.ExitOK}
+		}
 		if deps.Raw == nil {
 			return writeErr(deps.Stdout, NewError(CodeInternalError, "raw transport 未初始化"))
 		}
-		if err := deps.Raw(ctx, rest); err != nil {
-			return writeErr(deps.Stdout, err)
+		result, err := deps.Raw(ctx, rest)
+		if err != nil {
+			return writeRawFailure(deps.Stdout, result, err)
 		}
-		return Result{ExitCode: cli.ExitOK}
+		return writeOK(deps.Stdout, result.Data, result.Meta)
 	default:
 		_ = cli.UnknownCommand(deps.Stdout, args)
 		return Result{ExitCode: cli.ExitUsage}
@@ -95,7 +106,11 @@ func Execute(ctx context.Context, args []string, deps RuntimeDependencies) Resul
 }
 
 func runConfig(args []string, cfg Config, deps RuntimeDependencies) Result {
-	if len(args) == 0 || args[0] != "check" {
+	if hasHelp(args) || len(args) == 0 {
+		fmt.Fprint(deps.Stdout, configHelpText())
+		return Result{ExitCode: cli.ExitOK}
+	}
+	if args[0] != "check" {
 		return writeErr(deps.Stdout, NewError(CodeUnknownCommand, "Unknown command: config "+strings.Join(args, " ")))
 	}
 	data := CheckConfig(cfg)
@@ -111,8 +126,9 @@ func runConfig(args []string, cfg Config, deps RuntimeDependencies) Result {
 }
 
 func runAuth(ctx context.Context, args []string, auth *AuthService, deps RuntimeDependencies) Result {
-	if len(args) == 0 {
-		return writeErr(deps.Stdout, NewError(CodeUnknownCommand, "Unknown command: auth"))
+	if len(args) == 0 || hasHelp(args) {
+		fmt.Fprint(deps.Stdout, authHelpText())
+		return Result{ExitCode: cli.ExitOK}
 	}
 	switch args[0] {
 	case "status":
@@ -158,8 +174,9 @@ func runAuth(ctx context.Context, args []string, auth *AuthService, deps Runtime
 }
 
 func runProject(ctx context.Context, args []string, svc *Service, deps RuntimeDependencies) Result {
-	if len(args) == 0 {
-		return writeErr(deps.Stdout, NewError(CodeUnknownCommand, "Unknown command: project"))
+	if len(args) == 0 || hasHelp(args) {
+		fmt.Fprint(deps.Stdout, projectHelpText())
+		return Result{ExitCode: cli.ExitOK}
 	}
 	switch args[0] {
 	case "list":
@@ -209,8 +226,9 @@ func runProject(ctx context.Context, args []string, svc *Service, deps RuntimeDe
 }
 
 func runWorkItem(ctx context.Context, args []string, svc *Service, deps RuntimeDependencies) Result {
-	if len(args) == 0 {
-		return writeErr(deps.Stdout, NewError(CodeUnknownCommand, "Unknown command: work-item"))
+	if len(args) == 0 || hasHelp(args) {
+		fmt.Fprint(deps.Stdout, workItemHelpText(args))
+		return Result{ExitCode: cli.ExitOK}
 	}
 	switch args[0] {
 	case "get":
@@ -300,6 +318,10 @@ func runWorkItem(ctx context.Context, args []string, svc *Service, deps RuntimeD
 }
 
 func runWrite(ctx context.Context, action string, args []string, svc *Service, deps RuntimeDependencies) Result {
+	if hasHelp(args) {
+		fmt.Fprint(deps.Stdout, workItemHelpText([]string{action}))
+		return Result{ExitCode: cli.ExitOK}
+	}
 	fs := flag.NewFlagSet("work-item "+action, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	inputFlag := fs.String("input", "", "input source; use - for stdin JSON")
@@ -380,6 +402,21 @@ func writeErr(w io.Writer, err error) Result {
 	return Result{ExitCode: cli.ExitCodeFor(pe.Code)}
 }
 
+func writeRawFailure(w io.Writer, result RawResult, err error) Result {
+	pe := Classify(err)
+	msg := Redact(pe.Message)
+	_ = cli.WriteJSON(w, cli.Response{
+		OK:   false,
+		Data: result.Data,
+		Error: &cli.ErrorBody{
+			Code:    pe.Code,
+			Message: msg,
+		},
+		Meta: result.Meta,
+	})
+	return Result{ExitCode: cli.ExitCodeFor(pe.Code)}
+}
+
 func hasHelp(args []string) bool {
 	for _, arg := range args {
 		if arg == "--help" || arg == "-h" {
@@ -424,9 +461,149 @@ Usage:
   pingcode auth status|login|complete|logout
   pingcode project list|schema
   pingcode work-item get|search|mine|create|update|transition|comment
-  pingcode raw -- <restish-args>
+  pingcode raw <METHOD> <path> [--body JSON]
 
 Writes default to dry-run. Pass --apply to execute.
+Use "<command> --help" for command-specific usage and stdin JSON fields.
+`
+}
+
+func configHelpText() string {
+	return `pingcode config check
+
+Validate local PingCode configuration without revealing credentials.
+`
+}
+
+func authHelpText() string {
+	return `pingcode auth
+
+Usage:
+  pingcode auth status
+  pingcode auth login
+  pingcode auth complete --callback-url-stdin
+  pingcode auth logout
+
+auth complete reads the OAuth callback URL from stdin.
+`
+}
+
+func projectHelpText() string {
+	return `pingcode project
+
+Usage:
+  pingcode project list [--identifier ID] [--page-index N] [--page-size N]
+  pingcode project schema [--kind bug|requirement] [--identifier ID] [--project-id ID] [--type-id ID]
+`
+}
+
+func workItemHelpText(args []string) string {
+	action := ""
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		action = args[0]
+	}
+	switch action {
+	case "get":
+		return `pingcode work-item get
+
+Usage:
+  pingcode work-item get (--id ID | --identifier DEMO-1) [--kind bug|requirement]
+                         [--include-comments] [--project-identifier ID] [--project-id ID]
+`
+	case "search":
+		return `pingcode work-item search
+
+Usage:
+  pingcode work-item search [--kinds bug,requirement] [--keywords TEXT]
+                            [--states ...] [--priorities ...] [--assignees ...]
+                            [--updated-after ...] [--updated-before ...]
+                            [--page-index N] [--page-size N]
+                            [--project-identifier ID] [--project-id ID]
+`
+	case "mine":
+		return `pingcode work-item mine
+
+Usage:
+  pingcode work-item mine [--assignee NAME] [--kinds bug,requirement] [--states ...]
+                          [--updated-after ...] [--updated-before ...] [--page-size N]
+                          [--project-identifier ID] [--project-id ID]
+
+Requires --assignee or PINGCODE_DEFAULT_ASSIGNEE_NAME.
+`
+	case "create":
+		return `pingcode work-item create
+
+Usage:
+  pingcode work-item create --input - [--apply]
+
+stdin JSON fields:
+  kind, title (required), description, priorityName, assigneeName,
+  statusName, parent, properties, projectIdentifier, projectId
+
+Default is dry-run. Pass --apply to create.
+`
+	case "update":
+		return `pingcode work-item update
+
+Usage:
+  pingcode work-item update --input - [--apply]
+
+stdin JSON fields:
+  kind, workItemId|identifier, expectedCurrentState (recommended),
+  title, description, priorityName, assigneeName, parent, properties,
+  projectIdentifier, projectId
+
+description="" clears to PingCode empty rich text (<p></p>).
+Default is dry-run. Pass --apply to update.
+`
+	case "transition":
+		return `pingcode work-item transition
+
+Usage:
+  pingcode work-item transition --input - [--apply]
+
+stdin JSON fields:
+  kind, workItemId|identifier, statusName|stateId,
+  expectedCurrentState (recommended), comment,
+  projectIdentifier, projectId
+
+Default is dry-run. Pass --apply to transition.
+`
+	case "comment":
+		return `pingcode work-item comment
+
+Usage:
+  pingcode work-item comment --input - [--apply]
+
+stdin JSON fields:
+  kind, workItemId|identifier, content (required),
+  projectIdentifier, projectId
+
+Default is dry-run. Pass --apply to comment.
+`
+	default:
+		return `pingcode work-item
+
+Usage:
+  pingcode work-item get|search|mine|create|update|transition|comment [--help]
+
+Writes (create/update/transition/comment) read one JSON document from stdin via --input -
+and default to dry-run unless --apply is set.
+`
+	}
+}
+
+func rawHelpText() string {
+	return `pingcode raw
+
+Controlled HTTP escape hatch for PingCode API debugging.
+Restish is linked into the binary for version/compliance only; requests use net/http.
+
+Usage:
+  pingcode raw <GET|POST|PATCH|PUT|DELETE|HEAD> <path> [--body JSON]
+
+Path must be a relative API path such as /v1/project/projects.
+Stdout is always exactly one JSON document.
 `
 }
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xfe10/aicli/internal/pingcode"
 	"github.com/0xfe10/aicli/internal/restishrt"
 )
 
@@ -37,54 +39,30 @@ func TestRawSingleJSONAndNoOpenAPIDiscovery(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	type resp struct {
-		OK    bool           `json:"ok"`
-		Data  map[string]any `json:"data"`
-		Error *struct {
-			Code    string `json:"code"`
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-
-	parse := func(args []string) (resp, error) {
-		var stdout, stderr bytes.Buffer
+	run := func(args []string) (restishrt.Result, error) {
 		rt := &restishrt.Runtime{
 			APIBaseURL: srv.URL,
 			Auth:       func(context.Context) (string, error) { return "Bearer test-token-secret", nil },
-			Stdout:     &stdout,
-			Stderr:     &stderr,
 		}
-		err := rt.Run(context.Background(), args)
-		var out resp
-		dec := json.NewDecoder(bytes.NewReader(stdout.Bytes()))
-		if derr := dec.Decode(&out); derr != nil {
-			t.Fatalf("decode: %v stdout=%s", derr, stdout.String())
-		}
-		var extra json.RawMessage
-		if derr := dec.Decode(&extra); derr != io.EOF {
-			t.Fatalf("stdout must be exactly one JSON document, got trailing: %s", stdout.String())
-		}
-		if strings.Contains(stdout.String(), "test-token-secret") || strings.Contains(stderr.String(), "test-token-secret") {
-			t.Fatalf("token leaked: stdout=%s stderr=%s", stdout.String(), stderr.String())
-		}
-		return out, err
+		return rt.Run(context.Background(), args)
 	}
 
-	got, err := parse([]string{"GET", "/v1/project/projects"})
-	if err != nil || !got.OK {
+	got, err := run([]string{"GET", "/v1/project/projects"})
+	if err != nil || got.Data == nil {
 		t.Fatalf("GET failed: err=%v got=%#v", err, got)
 	}
-	got, err = parse([]string{"POST", "/v1/project/work_items", "--body", `{"title":"x"}`})
-	if err != nil || !got.OK {
+	got, err = run([]string{"POST", "/v1/project/work_items", "--body", `{"title":"x"}`})
+	if err != nil || got.Data == nil {
 		t.Fatalf("POST failed: err=%v got=%#v", err, got)
 	}
-	got, err = parse([]string{"PATCH", "/v1/project/work_items/1", "--body", `{"title":"y"}`})
-	if err == nil || got.OK {
-		t.Fatalf("PATCH 400 should fail: %#v", got)
+	_, err = run([]string{"PATCH", "/v1/project/work_items/1", "--body", `{"title":"y"}`})
+	if err == nil {
+		t.Fatal("PATCH 400 should fail")
 	}
-	got, err = parse([]string{"DELETE", "/v1/project/work_items/1"})
-	if err == nil || got.OK || got.Error == nil || got.Error.Code != "UPSTREAM_ERROR" {
-		t.Fatalf("DELETE 500: %#v err=%v", got, err)
+	_, err = run([]string{"DELETE", "/v1/project/work_items/1"})
+	var coded interface{ ErrorCode() string }
+	if err == nil || !errors.As(err, &coded) || coded.ErrorCode() != "UPSTREAM_ERROR" {
+		t.Fatalf("DELETE 500: err=%v", err)
 	}
 	if sawOpenAPI {
 		t.Fatal("raw must not probe openapi/swagger")
@@ -97,30 +75,77 @@ func TestRawTimeout(t *testing.T) {
 		w.WriteHeader(200)
 	}))
 	defer srv.Close()
-	var stdout bytes.Buffer
 	rt := &restishrt.Runtime{
 		APIBaseURL: srv.URL,
-		Stdout:     &stdout,
 		HTTP:       &http.Client{Timeout: time.Millisecond},
 	}
-	err := rt.Run(context.Background(), []string{"GET", "/slow"})
+	_, err := rt.Run(context.Background(), []string{"GET", "/slow"})
 	if err == nil {
 		t.Fatal("expected timeout")
-	}
-	var doc map[string]any
-	if jerr := json.Unmarshal(stdout.Bytes(), &doc); jerr != nil {
-		t.Fatal(jerr)
-	}
-	if doc["ok"] != false {
-		t.Fatalf("doc=%#v", doc)
 	}
 }
 
 func TestRawRejectsAbsoluteURL(t *testing.T) {
-	var stdout bytes.Buffer
-	rt := &restishrt.Runtime{APIBaseURL: "https://open.pingcode.com", Stdout: &stdout}
-	err := rt.Run(context.Background(), []string{"GET", "https://evil.example/v1"})
+	rt := &restishrt.Runtime{APIBaseURL: "https://open.pingcode.com"}
+	_, err := rt.Run(context.Background(), []string{"GET", "https://evil.example/v1"})
 	if err == nil {
 		t.Fatal("expected reject")
+	}
+}
+
+func TestCommandLayerOwnsRawJSONOnceOnError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"message":"bad"}`, http.StatusBadRequest)
+	}))
+	defer srv.Close()
+
+	rt := &restishrt.Runtime{APIBaseURL: srv.URL}
+	var stdout bytes.Buffer
+	result := pingcode.Execute(context.Background(), []string{"raw", "GET", "/bad"}, pingcode.RuntimeDependencies{
+		Stdout: &stdout,
+		Raw: func(ctx context.Context, args []string) (pingcode.RawResult, error) {
+			rawResult, err := rt.Run(ctx, args)
+			return pingcode.RawResult{Data: rawResult.Data, Meta: rawResult.Meta}, err
+		},
+	})
+	if result.ExitCode == 0 {
+		t.Fatal("expected non-zero exit")
+	}
+	dec := json.NewDecoder(bytes.NewReader(stdout.Bytes()))
+	var doc map[string]any
+	if err := dec.Decode(&doc); err != nil {
+		t.Fatalf("decode: %v output=%s", err, stdout.String())
+	}
+	var extra json.RawMessage
+	if err := dec.Decode(&extra); err != io.EOF {
+		t.Fatalf("expected exactly one JSON document: %s", stdout.String())
+	}
+	if doc["ok"] != false {
+		t.Fatalf("unexpected doc: %#v", doc)
+	}
+	data, _ := doc["data"].(map[string]any)
+	if data == nil || data["status"] != float64(400) {
+		t.Fatalf("expected HTTP data on failure: %#v", doc)
+	}
+	meta, _ := doc["meta"].(map[string]any)
+	if meta["transport"] != "controlled-net-http" {
+		t.Fatalf("unexpected transport metadata: %#v", meta)
+	}
+}
+
+func TestWorkItemCreateHelpIsCommandSpecific(t *testing.T) {
+	var stdout bytes.Buffer
+	result := pingcode.Execute(context.Background(), []string{"work-item", "create", "--help"}, pingcode.RuntimeDependencies{
+		Stdout: &stdout,
+	})
+	if result.ExitCode != 0 {
+		t.Fatalf("exit=%d", result.ExitCode)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "pingcode work-item create") || !strings.Contains(out, "stdin JSON fields") {
+		t.Fatalf("expected create help, got: %s", out)
+	}
+	if strings.Contains(out, "pingcode auth status|login") {
+		t.Fatalf("root help leaked into create --help: %s", out)
 	}
 }

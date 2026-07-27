@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -22,15 +21,29 @@ const pinnedRestishVersion = "2.3.0"
 // AuthProvider supplies Authorization headers for raw requests.
 type AuthProvider func(ctx context.Context) (string, error)
 
-// Runtime wraps embedded Restish metadata and a controlled raw HTTP escape hatch.
+// Runtime provides a controlled raw HTTP escape hatch for pingcode raw.
 // Domain commands never use this path. OpenAPI discovery is intentionally disabled.
+// Restish remains linked for version/compliance inventory only; requests use net/http.
 type Runtime struct {
 	APIBaseURL string
 	Auth       AuthProvider
-	Stdout     io.Writer
-	Stderr     io.Writer
 	HTTP       *http.Client
 }
+
+// Result is returned to the command layer, which owns stdout encoding.
+type Result struct {
+	Data any
+	Meta any
+}
+
+// Error carries a stable CLI error code.
+type Error struct {
+	Code    string
+	Message string
+}
+
+func (e *Error) Error() string     { return e.Message }
+func (e *Error) ErrorCode() string { return e.Code }
 
 // Version returns the pinned embedded Restish module version.
 func Version() string {
@@ -39,26 +52,17 @@ func Version() string {
 }
 
 // Run executes pingcode raw <METHOD> <path> [--body JSON].
-// stdout is exactly one JSON document owned by this function.
-func (r *Runtime) Run(ctx context.Context, args []string) error {
-	outW := r.Stdout
-	if outW == nil {
-		outW = os.Stdout
-	}
-	errW := r.Stderr
-	if errW == nil {
-		errW = os.Stderr
-	}
-
+// It never writes stdout or stderr; the command layer encodes exactly once.
+func (r *Runtime) Run(ctx context.Context, args []string) (Result, error) {
 	method, path, body, err := parseRawArgs(args)
 	if err != nil {
-		return writeRawErr(outW, "INVALID_ARGUMENT", err.Error())
+		return Result{}, rawError("INVALID_ARGUMENT", err.Error())
 	}
 
 	base := strings.TrimRight(r.APIBaseURL, "/")
 	fullURL, err := joinURL(base, path)
 	if err != nil {
-		return writeRawErr(outW, "INVALID_ARGUMENT", err.Error())
+		return Result{}, rawError("INVALID_ARGUMENT", err.Error())
 	}
 
 	client := r.HTTP
@@ -72,7 +76,7 @@ func (r *Runtime) Run(ctx context.Context, args []string) error {
 	}
 	req, err := http.NewRequestWithContext(ctx, method, fullURL, bodyReader)
 	if err != nil {
-		return writeRawErr(outW, "INTERNAL_ERROR", redact.String(err.Error()))
+		return Result{}, rawError("INTERNAL_ERROR", err.Error())
 	}
 	req.Header.Set("Accept", "application/json")
 	if body != nil {
@@ -81,24 +85,23 @@ func (r *Runtime) Run(ctx context.Context, args []string) error {
 	if r.Auth != nil {
 		authz, err := r.Auth(ctx)
 		if err != nil {
-			return writeRawErr(outW, "AUTH_REQUIRED", redact.String(err.Error()))
+			return Result{}, rawError("AUTH_REQUIRED", err.Error())
 		}
 		req.Header.Set("Authorization", authz)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		_, _ = fmt.Fprintln(errW, redact.String(err.Error()))
 		code := "UPSTREAM_ERROR"
 		if ctx.Err() != nil || strings.Contains(strings.ToLower(err.Error()), "timeout") {
 			code = "UPSTREAM_TIMEOUT"
 		}
-		return writeRawErr(outW, code, redact.String(err.Error()))
+		return Result{}, rawError(code, err.Error())
 	}
 	defer resp.Body.Close()
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
-		return writeRawErr(outW, "UPSTREAM_ERROR", "读取响应失败")
+		return Result{}, rawError("UPSTREAM_ERROR", "读取响应失败")
 	}
 
 	var parsed any
@@ -108,37 +111,24 @@ func (r *Runtime) Run(ctx context.Context, args []string) error {
 		}
 	}
 
-	ok := resp.StatusCode >= 200 && resp.StatusCode < 300
-	enc := json.NewEncoder(outW)
-	enc.SetIndent("", "  ")
-	doc := map[string]any{
-		"ok": ok,
-		"data": map[string]any{
-			"status":  resp.StatusCode,
-			"headers": redactHeaders(resp.Header),
-			"body":    parsed,
-		},
-		"meta": map[string]any{
-			"command":         "raw",
-			"method":          method,
-			"url":             redact.String(fullURL),
-			"restish_version": pinnedRestishVersion,
-			"transport":       "embedded-restish-controlled-http",
-		},
+	data := map[string]any{
+		"status":  resp.StatusCode,
+		"headers": redactHeaders(resp.Header),
+		"body":    parsed,
 	}
-	if !ok {
-		doc["error"] = map[string]string{
-			"code":    mapHTTPStatus(resp.StatusCode),
-			"message": fmt.Sprintf("HTTP %d", resp.StatusCode),
-		}
+	meta := map[string]any{
+		"command":         "raw",
+		"method":          method,
+		"url":             redact.String(fullURL),
+		"restish_version": pinnedRestishVersion,
+		"transport":       "controlled-net-http",
+		"restish_role":    "linked-only",
 	}
-	if err := enc.Encode(doc); err != nil {
-		return err
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		// Keep response data for debugging; command layer still emits one JSON document.
+		return Result{Data: data, Meta: meta}, rawError(mapHTTPStatus(resp.StatusCode), fmt.Sprintf("HTTP %d", resp.StatusCode))
 	}
-	if !ok {
-		return fmt.Errorf("raw request failed with HTTP %d", resp.StatusCode)
-	}
-	return nil
+	return Result{Data: data, Meta: meta}, nil
 }
 
 func parseRawArgs(args []string) (method, path string, body []byte, err error) {
@@ -234,19 +224,6 @@ func mapHTTPStatus(status int) string {
 	}
 }
 
-func writeRawErr(w io.Writer, code, message string) error {
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	_ = enc.Encode(map[string]any{
-		"ok": false,
-		"error": map[string]string{
-			"code":    code,
-			"message": redact.String(message),
-		},
-		"meta": map[string]any{
-			"command":         "raw",
-			"restish_version": pinnedRestishVersion,
-		},
-	})
-	return fmt.Errorf("%s", message)
+func rawError(code, message string) error {
+	return &Error{Code: code, Message: redact.String(message)}
 }

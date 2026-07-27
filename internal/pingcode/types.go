@@ -95,13 +95,14 @@ type Comment struct {
 
 // WorkItem is the core domain object.
 type WorkItem struct {
-	ID               string         `json:"id"`
-	URL              string         `json:"url,omitempty"`
-	HTMLURL          string         `json:"html_url,omitempty"`
-	Identifier       string         `json:"identifier,omitempty"`
-	Title            string         `json:"title,omitempty"`
-	Description      string         `json:"description,omitempty"`
-	Type             *Ref           `json:"type,omitempty"`
+	ID          string `json:"id"`
+	URL         string `json:"url,omitempty"`
+	HTMLURL     string `json:"html_url,omitempty"`
+	Identifier  string `json:"identifier,omitempty"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	// PingCode returns type as either a string id ("bug") or an expanded object.
+	Type             any            `json:"type,omitempty"`
 	State            *Ref           `json:"state,omitempty"`
 	Priority         *Ref           `json:"priority,omitempty"`
 	Assignee         *Ref           `json:"assignee,omitempty"`

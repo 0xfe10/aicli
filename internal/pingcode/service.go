@@ -43,7 +43,7 @@ func (s *Service) GetSchema(ctx context.Context, kind *WorkItemKind, projectIden
 	if err != nil {
 		return nil, err
 	}
-	membersPage, err := s.client.ListProjectMembers(ctx, project.ID, 0, 200)
+	membersPage, err := s.client.ListProjectMembers(ctx, project.ID, 0, 100)
 	if err != nil {
 		return nil, err
 	}
@@ -663,7 +663,7 @@ func (s *Service) getKindSchema(ctx context.Context, kind WorkItemKind, projectI
 	if err != nil {
 		return SchemaContext{}, err
 	}
-	membersPage, err := s.client.ListProjectMembers(ctx, project.ID, 0, 200)
+	membersPage, err := s.client.ListProjectMembers(ctx, project.ID, 0, 100)
 	if err != nil {
 		return SchemaContext{}, err
 	}
@@ -933,10 +933,18 @@ func (s *Service) buildFieldChanges(ctx context.Context, item WorkItem, schema S
 		payload.Set("title", *in.Title)
 		changes = append(changes, FieldChange{Field: "title", From: item.Title, To: *in.Title})
 	}
-	if in.Description != nil && *in.Description != item.Description {
-		// Empty string is an explicit clear/set-empty; serialize as "" (not omitted).
-		payload.Set("description", *in.Description)
-		changes = append(changes, FieldChange{Field: "description", From: item.Description, To: *in.Description})
+	if in.Description != nil {
+		if *in.Description == "" {
+			// PingCode stores rich text. Real-tenant verification shows "" and null
+			// are ignored, while <p></p> is the canonical empty document.
+			if !isDescriptionEmpty(item.Description) {
+				payload.Set("description", "<p></p>")
+				changes = append(changes, FieldChange{Field: "description", From: item.Description, To: ""})
+			}
+		} else if *in.Description != item.Description {
+			payload.Set("description", *in.Description)
+			changes = append(changes, FieldChange{Field: "description", From: item.Description, To: *in.Description})
+		}
 	}
 	if in.PriorityName != nil {
 		if strings.TrimSpace(*in.PriorityName) == "" {
@@ -1016,6 +1024,15 @@ func mapsEqual(a, b map[string]any) bool {
 		}
 	}
 	return true
+}
+
+func isDescriptionEmpty(value string) bool {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case "", "<p></p>", "<p><br></p>", "<p><br/></p>":
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Service) resolveLegalTransitions(ctx context.Context, schema SchemaContext, currentStateID, toStateID string) (map[string]any, error) {

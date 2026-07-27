@@ -67,6 +67,10 @@ func Classify(err error) *Error {
 	if errors.As(err, &pe) {
 		return pe
 	}
+	var coded interface{ ErrorCode() string }
+	if errors.As(err, &coded) {
+		return WrapError(coded.ErrorCode(), redact.String(err.Error()), err)
+	}
 	var api *APIError
 	if errors.As(err, &api) {
 		switch {

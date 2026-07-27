@@ -77,6 +77,17 @@ func TestResolveProjectRequiresExactMatch(t *testing.T) {
 	}
 }
 
+func TestWorkItemAcceptsStringTypeFromRealAPI(t *testing.T) {
+	var item pingcode.WorkItem
+	raw := `{"id":"wi1","identifier":"CS-1","type":"bug","state":{"id":"s1","name":"新提交"}}`
+	if err := json.Unmarshal([]byte(raw), &item); err != nil {
+		t.Fatal(err)
+	}
+	if item.Type != "bug" {
+		t.Fatalf("type=%#v", item.Type)
+	}
+}
+
 func TestUpdateRegetsBeforePatch(t *testing.T) {
 	var patches atomic.Int32
 	var gets atomic.Int32
@@ -141,7 +152,7 @@ func TestUpdateRegetsBeforePatch(t *testing.T) {
 	}
 }
 
-func TestUpdateClearDescriptionSendsEmptyString(t *testing.T) {
+func TestUpdateClearDescriptionSendsCanonicalEmptyHTML(t *testing.T) {
 	var patchBody string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -211,8 +222,8 @@ func TestUpdateClearDescriptionSendsEmptyString(t *testing.T) {
 	if _, ok := patch["description"]; !ok {
 		t.Fatalf("description must be present: %s", patchBody)
 	}
-	if patch["description"] != "" {
-		t.Fatalf("description want empty string, got %#v", patch["description"])
+	if patch["description"] != "<p></p>" {
+		t.Fatalf("description should use canonical empty HTML, got %#v", patch["description"])
 	}
 	if patch["assignee_id"] != nil {
 		t.Fatalf("assignee_id should be null, got %#v body=%s", patch["assignee_id"], patchBody)
@@ -247,12 +258,12 @@ func TestUpdateClearAlreadyEmptyIsNoChange(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(page([]any{}))
 		case r.URL.Path == "/v1/project/work_items":
 			_ = json.NewEncoder(w).Encode(page([]any{map[string]any{
-				"id": "wi1", "identifier": "DEMO-1", "title": "Bug", "description": "",
+				"id": "wi1", "identifier": "DEMO-1", "title": "Bug", "description": "<p></p>",
 				"state": map[string]any{"id": "s1", "name": "新提交"},
 			}}))
 		case strings.HasPrefix(r.URL.Path, "/v1/project/work_items/"):
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"id": "wi1", "identifier": "DEMO-1", "title": "Bug", "description": "",
+				"id": "wi1", "identifier": "DEMO-1", "title": "Bug", "description": "<p></p>",
 				"state": map[string]any{"id": "s1", "name": "新提交"},
 			})
 		default:

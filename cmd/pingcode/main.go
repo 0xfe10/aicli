@@ -13,7 +13,7 @@ import (
 
 // Set by -ldflags at release build time.
 var (
-	version = "0.1.0"
+	version = "0.1.2"
 	commit  = "unknown"
 )
 
@@ -36,10 +36,11 @@ func main() {
 		raw := &restishrt.Runtime{
 			APIBaseURL: cfg.APIBaseURL,
 			Auth:       client.AuthorizationHeader,
-			Stdout:     os.Stdout,
-			Stderr:     os.Stderr,
 		}
-		deps.Raw = raw.Run
+		deps.Raw = func(ctx context.Context, args []string) (pingcode.RawResult, error) {
+			result, err := raw.Run(ctx, args)
+			return pingcode.RawResult{Data: result.Data, Meta: result.Meta}, err
+		}
 	}
 
 	result := pingcode.Execute(ctx, os.Args[1:], deps)
