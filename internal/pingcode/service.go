@@ -43,7 +43,7 @@ func (s *Service) GetSchema(ctx context.Context, kind *WorkItemKind, projectIden
 	if err != nil {
 		return nil, err
 	}
-	membersPage, err := s.client.ListProjectMembers(ctx, project.ID, 0, 100)
+	members, err := s.listAllProjectMembers(ctx, project.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (s *Service) GetSchema(ctx context.Context, kind *WorkItemKind, projectIden
 			"project":    project,
 			"types":      typesPage.Values,
 			"priorities": prioritiesPage.Values,
-			"members":    membersPage.Values,
+			"members":    members,
 		}, nil
 	}
 	typ, err := s.resolveType(typesPage.Values, *kind, typeID)
@@ -82,7 +82,7 @@ func (s *Service) GetSchema(ctx context.Context, kind *WorkItemKind, projectIden
 		"types":            typesPage.Values,
 		"states":           statesPage.Values,
 		"priorities":       prioritiesPage.Values,
-		"members":          membersPage.Values,
+		"members":          members,
 		"stateTransitions": flows,
 	}, nil
 }
@@ -663,7 +663,7 @@ func (s *Service) getKindSchema(ctx context.Context, kind WorkItemKind, projectI
 	if err != nil {
 		return SchemaContext{}, err
 	}
-	membersPage, err := s.client.ListProjectMembers(ctx, project.ID, 0, 100)
+	members, err := s.listAllProjectMembers(ctx, project.ID)
 	if err != nil {
 		return SchemaContext{}, err
 	}
@@ -673,8 +673,31 @@ func (s *Service) getKindSchema(ctx context.Context, kind WorkItemKind, projectI
 		Types:      typesPage.Values,
 		States:     statesPage.Values,
 		Priorities: prioritiesPage.Values,
-		Members:    membersPage.Values,
+		Members:    members,
 	}, nil
+}
+
+func (s *Service) listAllProjectMembers(ctx context.Context, projectID string) ([]ProjectMember, error) {
+	const pageSize = 100
+	const maxPages = 100
+	var all []ProjectMember
+	for pageIndex := 0; pageIndex < maxPages; pageIndex++ {
+		page, err := s.client.ListProjectMembers(ctx, projectID, pageIndex, pageSize)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, page.Values...)
+		if len(page.Values) == 0 {
+			break
+		}
+		if page.Total > 0 && len(all) >= page.Total {
+			break
+		}
+		if len(page.Values) < pageSize {
+			break
+		}
+	}
+	return all, nil
 }
 
 func (s *Service) resolveCurrentAssigneeName(ctx context.Context, override string) (string, error) {

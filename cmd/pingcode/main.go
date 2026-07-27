@@ -13,7 +13,7 @@ import (
 
 // Set by -ldflags at release build time.
 var (
-	version = "0.1.2"
+	version = "0.1.3"
 	commit  = "unknown"
 )
 

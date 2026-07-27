@@ -107,7 +107,9 @@ func (r *Runtime) Run(ctx context.Context, args []string) (Result, error) {
 	var parsed any
 	if len(bytes.TrimSpace(respBody)) > 0 {
 		if err := json.Unmarshal(respBody, &parsed); err != nil {
-			parsed = string(respBody)
+			parsed = redact.String(string(respBody))
+		} else {
+			parsed = redact.Value(parsed)
 		}
 	}
 

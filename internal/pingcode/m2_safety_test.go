@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -331,5 +332,95 @@ func TestCreateStopsWhenProjectNotFound(t *testing.T) {
 	}
 	if posts.Load() != 0 {
 		t.Fatalf("create must stop before POST, posts=%d", posts.Load())
+	}
+}
+
+func TestSchemaLoadsAllMemberPages(t *testing.T) {
+	var memberPages atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/auth/token":
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "t", "expires_in": 3600})
+		case r.URL.Path == "/v1/project/projects":
+			_ = json.NewEncoder(w).Encode(page([]any{
+				map[string]any{"id": "p1", "identifier": "DEMO", "name": "Demo"},
+			}))
+		case r.URL.Path == "/v1/project/work_item/types":
+			_ = json.NewEncoder(w).Encode(page([]any{
+				map[string]any{"id": "bug", "name": "缺陷", "normalized_name": "bug"},
+			}))
+		case r.URL.Path == "/v1/project/work_item/states":
+			_ = json.NewEncoder(w).Encode(page([]any{
+				map[string]any{"id": "s1", "name": "新提交"},
+			}))
+		case r.URL.Path == "/v1/project/work_item/priorities":
+			_ = json.NewEncoder(w).Encode(page([]any{
+				map[string]any{"id": "pr1", "name": "正常"},
+			}))
+		case strings.HasSuffix(r.URL.Path, "/members"):
+			memberPages.Add(1)
+			idx := r.URL.Query().Get("page_index")
+			size := r.URL.Query().Get("page_size")
+			if size != "100" {
+				t.Errorf("page_size=%s want 100", size)
+			}
+			values := make([]any, 0, 100)
+			switch idx {
+			case "0":
+				for i := 0; i < 100; i++ {
+					values = append(values, map[string]any{
+						"id": fmt.Sprintf("m%d", i),
+						"user": map[string]any{
+							"id": fmt.Sprintf("u%d", i), "name": fmt.Sprintf("user-%d", i), "display_name": fmt.Sprintf("User %d", i),
+						},
+					})
+				}
+				_ = json.NewEncoder(w).Encode(map[string]any{"page_size": 100, "page_index": 0, "total": 101, "values": values})
+			case "1":
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"page_size": 100, "page_index": 1, "total": 101,
+					"values": []any{map[string]any{
+						"id": "m100",
+						"user": map[string]any{
+							"id": "u100", "name": "user-100", "display_name": "User 100",
+						},
+					}},
+				})
+			default:
+				t.Errorf("unexpected page_index=%s", idx)
+				_ = json.NewEncoder(w).Encode(page([]any{}))
+			}
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	t.Setenv("PINGCODE_API_BASE_URL", srv.URL)
+	t.Setenv("PINGCODE_BASE_URL", "https://example.pingcode.com")
+	t.Setenv("PINGCODE_CLIENT_ID", "cid")
+	t.Setenv("PINGCODE_CLIENT_SECRET", "csecret")
+	t.Setenv("PINGCODE_AUTH_TOKEN_PATH", filepath.Join(dir, "auth.json"))
+	t.Setenv("PINGCODE_PROJECT_IDENTIFIER", "DEMO")
+
+	var stdout bytes.Buffer
+	result := pingcode.Execute(context.Background(), []string{"project", "schema", "--kind", "bug"}, pingcode.RuntimeDependencies{
+		Stdout: &stdout,
+	})
+	if result.ExitCode != 0 {
+		t.Fatalf("exit=%d out=%s", result.ExitCode, stdout.String())
+	}
+	if memberPages.Load() < 2 {
+		t.Fatalf("expected at least 2 member pages, got %d", memberPages.Load())
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	data := doc["data"].(map[string]any)
+	members := data["members"].([]any)
+	if len(members) != 101 {
+		t.Fatalf("members=%d want 101", len(members))
 	}
 }

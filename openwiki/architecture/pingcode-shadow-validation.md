@@ -1,6 +1,6 @@
 # PingCode shadow validation gate
 
-Status: **API validation passed; local fixed binary passes MCP dry-run parity. `v0.1.1` remains rejected.**
+Status: **v0.1.2 accepted for core domain commands; raw credential redaction patched for v0.1.3**
 
 This gate is required before release. Do not publish until both route families
 and controlled writes succeed against a real tenant.

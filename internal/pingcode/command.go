@@ -58,6 +58,18 @@ func Execute(ctx context.Context, args []string, deps RuntimeDependencies) Resul
 		fmt.Fprint(deps.Stdout, helpText())
 		return Result{ExitCode: cli.ExitOK}
 	}
+	// Help and version are local-only: never depend on LoadConfig().
+	if hasHelp(args) {
+		return writeLocalHelp(deps.Stdout, args)
+	}
+	if args[0] == "version" {
+		return writeOK(deps.Stdout, map[string]any{
+			"cli":     firstNonEmpty(deps.Version.CLI, "0.1.0"),
+			"commit":  firstNonEmpty(deps.Version.Commit, "unknown"),
+			"go":      firstNonEmpty(deps.Version.Go, runtime.Version()),
+			"restish": firstNonEmpty(deps.Version.Restish, "2.3.0"),
+		}, map[string]any{"command": "version"})
+	}
 
 	cfg, err := LoadConfig()
 	if err != nil {
@@ -71,13 +83,6 @@ func Execute(ctx context.Context, args []string, deps RuntimeDependencies) Resul
 	cmd := args[0]
 	rest := args[1:]
 	switch cmd {
-	case "version":
-		return writeOK(deps.Stdout, map[string]any{
-			"cli":     firstNonEmpty(deps.Version.CLI, "0.1.0"),
-			"commit":  firstNonEmpty(deps.Version.Commit, "unknown"),
-			"go":      firstNonEmpty(deps.Version.Go, runtime.Version()),
-			"restish": firstNonEmpty(deps.Version.Restish, "2.3.0"),
-		}, map[string]any{"command": "version"})
 	case "config":
 		return runConfig(rest, cfg, deps)
 	case "auth":
@@ -87,10 +92,6 @@ func Execute(ctx context.Context, args []string, deps RuntimeDependencies) Resul
 	case "work-item":
 		return runWorkItem(ctx, rest, svc, deps)
 	case "raw":
-		if hasHelp(rest) {
-			fmt.Fprint(deps.Stdout, rawHelpText())
-			return Result{ExitCode: cli.ExitOK}
-		}
 		if deps.Raw == nil {
 			return writeErr(deps.Stdout, NewError(CodeInternalError, "raw transport 未初始化"))
 		}
@@ -103,6 +104,28 @@ func Execute(ctx context.Context, args []string, deps RuntimeDependencies) Resul
 		_ = cli.UnknownCommand(deps.Stdout, args)
 		return Result{ExitCode: cli.ExitUsage}
 	}
+}
+
+func writeLocalHelp(w io.Writer, args []string) Result {
+	if len(args) == 0 {
+		fmt.Fprint(w, helpText())
+		return Result{ExitCode: cli.ExitOK}
+	}
+	switch args[0] {
+	case "config":
+		fmt.Fprint(w, configHelpText())
+	case "auth":
+		fmt.Fprint(w, authHelpText())
+	case "project":
+		fmt.Fprint(w, projectHelpText())
+	case "work-item":
+		fmt.Fprint(w, workItemHelpText(args[1:]))
+	case "raw":
+		fmt.Fprint(w, rawHelpText())
+	default:
+		fmt.Fprint(w, helpText())
+	}
+	return Result{ExitCode: cli.ExitOK}
 }
 
 func runConfig(args []string, cfg Config, deps RuntimeDependencies) Result {
