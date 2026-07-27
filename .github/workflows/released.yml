@@ -29,6 +29,7 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       commit: ${{ steps.release.outputs.commit }}
       short_commit: ${{ steps.release.outputs.short_commit }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
 
     steps:
       - name: Check out repository
@@ -66,6 +67,14 @@ jobs:
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "short_commit=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+
+          # SemVer prerelease: v1.2.3-foo is prerelease; v1.2.3 and v1.2.3+build are not.
+          version="${tag#v}"
+          if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+- ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
@@ -163,14 +172,24 @@ jobs:
           TAG: ${{ needs.verify.outputs.tag }}
           TAG_EXISTS: ${{ needs.verify.outputs.tag_exists }}
           COMMIT: ${{ needs.verify.outputs.commit }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
         run: |
           set -euo pipefail
+          create_flags=(--title "$TAG" --generate-notes)
+          if [[ "$PRERELEASE" == "true" ]]; then
+            create_flags+=(--prerelease)
+          fi
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             if [[ "$TAG_EXISTS" == "true" ]]; then
-              gh release create "$TAG" --verify-tag --title "$TAG" --generate-notes
+              gh release create "$TAG" --verify-tag "${create_flags[@]}"
             else
-              gh release create "$TAG" --target "$COMMIT" --title "$TAG" --generate-notes
+              gh release create "$TAG" --target "$COMMIT" "${create_flags[@]}"
             fi
+          fi
+          if [[ "$PRERELEASE" == "true" ]]; then
+            gh release edit "$TAG" --prerelease --latest=false
+          else
+            gh release edit "$TAG" --prerelease=false
           fi
           gh release upload "$TAG" \
             ./dist/*.tar.gz \
