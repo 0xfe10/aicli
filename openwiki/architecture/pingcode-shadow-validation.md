@@ -1,6 +1,6 @@
 # PingCode shadow validation gate
 
-Status: **v0.1.5 — Justfile/raw-timeout/umask/comments pagination fixes; full E2E apply/MCP oracle still gated (M4)**
+Status: **v0.1.5 released — M4 partial: MCP timestamp oracle pinned, CS member added, twin apply executed; OAuth user-mode + live Pod digest still need operator steps**
 
 This gate is required before release. Do not publish until both route families
 and controlled writes succeed against a real tenant.
@@ -168,3 +168,32 @@ Code-level gates landed before the next Release artifact:
   for the work item's current state and require `ok=true` / `dryRun=true`.
 - Token permission test forces `chmod 0644` after write so umask 0077 cannot flake.
 - Comments and state plans/flows paginate; comments expose `truncated`.
+
+## 2026-07-27 M4 progress
+
+Pinned MCP oracle after timestamp fix:
+
+- `MCP_ORACLE_COMMIT=04bc527333ced86a99ac926d31550cc47e62984f`
+- `MCP_ORACLE_IMAGE=ghcr.io/0xfe10/pingcode-mcp:sha-04bc527`
+- `MCP_ORACLE_DIGEST=sha256:d791e0c7afd66d43a7ff63bf29a82e041486f2637f8a84e6be18365c5f49809c`
+- `MCP_ORACLE_AMD64_DIGEST=sha256:f0d0df5e9df8b731fbbf5d30f35968961b9d2ee8bef28f7855390e1911f2d7c5`
+- GitOps production tag updated to `sha-04bc527` (`gitops-fes` commit `e113d38`).
+
+CS test project hardening:
+
+- Dedicated member **吴伟** added to `CS` via official `POST /v1/project/projects/{id}/members` (`user_id` only).
+- CLI `project schema` and MCP `list_project_members` both report 1 member with matching id/display name.
+- Existing evidence items retained: `CS-2`..`CS-5`.
+
+Twin-track apply (run `20260727T112159Z-m4-apply`, CLI `v0.1.5` + local MCP oracle):
+
+- CLI bug track: `CS-6` create/update/transition/comment; MCP read confirms title/state/comment.
+- MCP requirement track: `CS-7` create/update/transition/comment; CLI read confirms title/state/comment.
+- Legacy `CS-2` / `CS-5` titles unchanged after run.
+- Orchestrator: `scripts/m4_twin_track.py` + `just pingcode-m4-twin` (`M4_APPLY=1` for writes).
+
+Still operator-gated:
+
+- OAuth user-mode login/complete/refresh/logout (browser callback + dedicated `PINGCODE_AUTH_TOKEN_PATH`).
+- Live Kubernetes Pod `imageID` readback (no kubeconfig in CI runner); validate after Argo sync.
+- MCP twin compare against live `pincode-mcp.kahub.in` once HTTP token + synced digest are confirmed.

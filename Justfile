@@ -255,12 +255,34 @@ pingcode-shadow-mcp-compare:
     set -euo pipefail
     if [[ -z "${MCP_ORACLE_DIGEST:-}" || -z "${MCP_ORACLE_COMMIT:-}" ]]; then
       echo "MCP compare requires pinned MCP_ORACLE_DIGEST and MCP_ORACLE_COMMIT" >&2
-      echo "Plus local compare artifacts under dist/shadow/<runId>/ once the oracle is fixed." >&2
+      echo "Example: MCP_ORACLE_COMMIT=04bc527333ced86a99ac926d31550cc47e62984f" >&2
+      exit 64
+    fi
+    if [[ -z "${SHADOW_RUN_DIR:-}" ]]; then
+      echo "Set SHADOW_RUN_DIR to dist/shadow/<runId> or dist/m4/<runId> with CLI/MCP artifacts" >&2
       exit 64
     fi
     echo "MCP oracle digest=${MCP_ORACLE_DIGEST} commit=${MCP_ORACLE_COMMIT}" >&2
-    echo "Oracle twin compare not implemented yet for this digest; refusing rather than claiming parity." >&2
+    echo "Twin compare for ${SHADOW_RUN_DIR} is manual until MCP get_work_item oracle is live-validated on pod digest." >&2
     exit 64
+
+pingcode-m4-twin:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ -z "{{ pingcode_bin }}" ]]; then
+      echo "Set PINGCODE_BIN to v0.1.5 release binary" >&2
+      exit 64
+    fi
+    if [[ -z "${PINGCODE_MCP_HTTP_TOKEN:-}" ]]; then
+      echo "Set PINGCODE_MCP_HTTP_TOKEN for MCP HTTP /mcp access" >&2
+      exit 64
+    fi
+    run_id="${M4_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-m4}"
+    args=(python3 "{{ justfile_directory() }}/scripts/m4_twin_track.py" --pingcode-bin "{{ pingcode_bin }}" --mcp-url "${MCP_URL:-http://127.0.0.1:3000}" --mcp-token "${PINGCODE_MCP_HTTP_TOKEN}" --run-id "$run_id")
+    if [[ "${M4_APPLY:-0}" == "1" ]]; then
+      args+=(--apply)
+    fi
+    "${args[@]}"
 
 pingcode-release-verify: _pingcode-require-bin
     #!/usr/bin/env bash
