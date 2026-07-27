@@ -13,6 +13,7 @@ tags: [aicli, openwiki, cli, ai-services, restish]
 
 - [CLI platform](architecture/cli-platform.md) explains the shared runtime model.
 - [Service CLI contract](decisions/service-cli-contract.md) records integration rules.
+- [Unified CLI auth](decisions/unified-cli-auth.md) documents the shared login/status/logout contract.
 - [PingCode Restish adapter](architecture/pingcode-milestone0.md) records the first service implementation.
 - `services/` contains service registrations and generation metadata.
 - `cmd/` contains release command entrypoints.

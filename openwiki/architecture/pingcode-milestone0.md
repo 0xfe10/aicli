@@ -38,12 +38,17 @@ Callers provide credentials through either:
 
 1. `pingcode auth login --mode client` or `--mode token` (interactive; stored locally), or
 2. environment variables for CI / temporary override:
+   - `PINGCODE_API_BASE_URL` (optional Base URL override),
    - `PINGCODE_ACCESS_TOKEN`, or
    - `PINGCODE_CLIENT_ID` and `PINGCODE_CLIENT_SECRET` (both required together).
 
-Complete environment credentials always override `config.toml` for the current
+Login always prompts for Base URL and writes it with `[auth]` in one atomic update.
+Environment variables override individual `config.toml` fields for the current
 process and never rewrite the file. Incomplete client environment pairs are
 rejected. Secrets are not accepted on argv.
+
+Shared prompt/validation helpers live in `internal/authflow`; see
+[unified CLI auth](../decisions/unified-cli-auth.md).
 
 For client credentials, the handler requests
 `GET /v1/auth/token?grant_type=client_credentials&...`, stores the resulting token

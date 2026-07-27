@@ -22,9 +22,11 @@ Each service integration defines:
 - a default policy that blocks unintended writes;
 - tests for specification loading, authentication, and the safety gate.
 
-Credentials may come from environment variables or Restish's credential/token
-stores. Errors must not include access tokens, client secrets, authorization codes,
-or token endpoint response bodies.
+Credentials may come from environment variables or a local `config.toml` written
+by `<cli> auth login`. Environment variables override individual config fields and
+never rewrite the file. Secrets must not be accepted on argv. Errors must not
+include access tokens, client secrets, authorization codes, or token endpoint
+response bodies. See [unified CLI auth](unified-cli-auth.md).
 
 ## Generated surface
 

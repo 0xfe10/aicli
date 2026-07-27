@@ -18,23 +18,34 @@ a separate Restish installation is not needed.
 
 ## PingCode
 
-Save credentials once (interactive; secrets are not accepted on argv):
+Save credentials once (interactive; secrets are not accepted on argv).
+Login always prompts for Base URL, then credentials:
 
 ```sh
-pingcode auth login --mode client   # Client ID + Client Secret
-pingcode auth login --mode token    # existing access token
+pingcode auth login --mode client   # Base URL + Client ID + Client Secret
+pingcode auth login --mode token    # Base URL + access token
 pingcode auth status
 pingcode auth logout
 ```
 
-Credentials are stored at `$XDG_CONFIG_HOME/aicli/pingcode/config.toml`
+Credentials and Base URL are stored at `$XDG_CONFIG_HOME/aicli/pingcode/config.toml`
 (default `~/.config/aicli/pingcode/config.toml`) with directory mode `0700` and
-file mode `0600`.
+file mode `0600`. Example:
 
-Environment variables still override local config for CI and temporary use
+```toml
+base_url = "https://open.pingcode.com"
+
+[auth]
+mode = "client"
+client_id = "..."
+client_secret = "..."
+```
+
+Environment variables override individual config fields for CI and temporary use
 (without modifying the file):
 
 ```sh
+export PINGCODE_API_BASE_URL='https://open.pingcode.com'
 export PINGCODE_ACCESS_TOKEN='...'                    # token mode
 export PINGCODE_CLIENT_ID='...'                       # client mode (both required)
 export PINGCODE_CLIENT_SECRET='...'
@@ -59,6 +70,7 @@ export PINGCODE_WRITE_MODE=destructive  # also allow DELETE
 Configuration:
 
 - Local auth: `pingcode auth login|status|logout`
+- Precedence: environment > `config.toml` > compile-time defaults
 - `PINGCODE_ACCESS_TOKEN` or `PINGCODE_CLIENT_ID` / `PINGCODE_CLIENT_SECRET` (override)
 - `PINGCODE_WRITE_MODE`: `readonly` (default), `write`, or `destructive`
 - `PINGCODE_API_BASE_URL`: defaults to `https://open.pingcode.com`
@@ -68,7 +80,8 @@ Configuration:
 ## Fast Note Sync (`fns`)
 
 Save a Bearer token created in the FNS WebGUI
-(for example `p:rest c:aicli f:note_rw,file_rw`):
+(for example `p:rest c:aicli f:note_rw,file_rw`).
+Login always prompts for Base URL, then the access token:
 
 ```sh
 fns auth login --mode token
@@ -76,18 +89,31 @@ fns auth status
 fns auth logout
 ```
 
-Credentials are stored at `$XDG_CONFIG_HOME/aicli/fns/config.toml`
+Credentials and Base URL are stored at `$XDG_CONFIG_HOME/aicli/fns/config.toml`
 (default `~/.config/aicli/fns/config.toml`) with directory mode `0700` and
-file mode `0600`.
+file mode `0600`. Example:
+
+```toml
+base_url = "https://obsidian-fns.example.org"
+client = "aicli"
+
+[auth]
+mode = "token"
+access_token = "..."
+```
 
 ```sh
 export FNS_ACCESS_TOKEN='...'
-export FNS_BASE_URL='https://fns.example.com'
+export FNS_BASE_URL='https://your-fns-host.example'
 export FNS_SPEC_URL='https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/b6b4566352f39e0404530ed1b58248a815a6d763/docs/swagger.yaml'
 export FNS_CLIENT='aicli'
 export FNS_WRITE_MODE=write        # also allow POST, PUT, PATCH
 export FNS_WRITE_MODE=destructive  # also allow DELETE / recycle-clear
 ```
+
+The compile-time default Base URL (`https://fns.example.com`) is a placeholder so
+`fns --help` works. Real API requests fail until you run `fns auth login` or set
+`FNS_BASE_URL`. See [unified CLI auth](openwiki/decisions/unified-cli-auth.md).
 
 First release exposes Note/File/Folder commands only. Restish owns argument
 encoding, multipart upload, binary download, and output formatting:
