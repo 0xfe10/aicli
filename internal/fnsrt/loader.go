@@ -34,6 +34,10 @@ func (SpecLoader) LoadWithOptions(body []byte, opts restish.LoadOptions) (*resti
 	if err != nil {
 		return nil, err
 	}
+	allowLocalFiles := strings.TrimSpace(opts.LocalPath) != ""
+	if err := rejectExternalRefs(converted, allowLocalFiles); err != nil {
+		return nil, err
+	}
 	document, err := libopenapi.NewDocumentWithConfiguration(converted, documentConfig(opts))
 	if err != nil {
 		return nil, fmt.Errorf("parse fixed FNS OpenAPI: %w", err)
@@ -45,7 +49,7 @@ func (SpecLoader) LoadWithOptions(body []byte, opts restish.LoadOptions) (*resti
 		RequestedURL:     opts.RequestedURL,
 		SourceURL:        opts.SourceURL,
 		LocalPath:        opts.LocalPath,
-		AllowCrossOrigin: opts.AllowCrossOrigin,
+		AllowCrossOrigin: false,
 	}, nil
 }
 
@@ -118,20 +122,83 @@ func decodeSpecMap(body []byte) (map[string]any, error) {
 	return raw, nil
 }
 
+// rejectExternalRefs enforces a fail-closed $ref policy:
+// - same-document #/components/... refs are allowed
+// - remote http(s) refs are always rejected
+// - file:// refs are always rejected
+// - relative file refs are allowed only for explicit local specs
+func rejectExternalRefs(openAPI3 []byte, allowLocalFiles bool) error {
+	var doc any
+	if err := json.Unmarshal(openAPI3, &doc); err != nil {
+		return fmt.Errorf("decode OpenAPI for $ref policy: %w", err)
+	}
+	var walk func(node any) error
+	walk = func(node any) error {
+		switch value := node.(type) {
+		case map[string]any:
+			if ref, ok := value["$ref"]; ok {
+				refText := strings.TrimSpace(fmt.Sprint(ref))
+				if err := validateRef(refText, allowLocalFiles); err != nil {
+					return err
+				}
+			}
+			for _, child := range value {
+				if err := walk(child); err != nil {
+					return err
+				}
+			}
+		case []any:
+			for _, child := range value {
+				if err := walk(child); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	return walk(doc)
+}
+
+func validateRef(ref string, allowLocalFiles bool) error {
+	if ref == "" {
+		return fmt.Errorf("OpenAPI $ref must not be empty")
+	}
+	if strings.HasPrefix(ref, "#") {
+		return nil
+	}
+	lower := strings.ToLower(ref)
+	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
+		return fmt.Errorf("external OpenAPI $ref is not allowed: %s", ref)
+	}
+	if strings.HasPrefix(lower, "file:") {
+		return fmt.Errorf("file OpenAPI $ref is not allowed: %s", ref)
+	}
+	if u, err := url.Parse(ref); err == nil && u.Scheme != "" && u.Scheme != "file" {
+		return fmt.Errorf("external OpenAPI $ref is not allowed: %s", ref)
+	}
+	if !allowLocalFiles {
+		return fmt.Errorf("relative OpenAPI file $ref is not allowed for remote specs: %s", ref)
+	}
+	cleaned := filepath.Clean(ref)
+	if strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) || cleaned == ".." {
+		return fmt.Errorf("OpenAPI file $ref escapes the local base directory: %s", ref)
+	}
+	return nil
+}
+
 func documentConfig(opts restish.LoadOptions) *datamodel.DocumentConfiguration {
 	cfg := datamodel.NewDocumentConfiguration()
-	cfg.AllowFileReferences = true
-	cfg.AllowRemoteReferences = opts.AllowCrossOrigin
+	// Fail closed: never fetch remote $ref networks; only allow local files when
+	// the caller provided an explicit local path for a local/spec-file load.
+	cfg.AllowRemoteReferences = false
 	if opts.LocalPath != "" {
+		cfg.AllowFileReferences = true
 		cfg.BasePath = opts.LocalPath
 		if info, err := os.Stat(opts.LocalPath); err == nil && !info.IsDir() {
 			cfg.BasePath = filepath.Dir(opts.LocalPath)
 		}
-	}
-	if opts.SourceURL != "" {
-		if u, err := url.Parse(opts.SourceURL); err == nil {
-			cfg.BaseURL = u
-		}
+	} else {
+		cfg.AllowFileReferences = false
 	}
 	return cfg
 }
