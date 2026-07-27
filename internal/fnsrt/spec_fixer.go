@@ -3,7 +3,6 @@ package fnsrt
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -21,7 +20,7 @@ var allowedPathPrefixes = []string{
 	"/api/folders",
 }
 
-// FixSpec applies FNS-specific OpenAPI corrections after Swagger 2 conversion.
+// FixSpec applies FNS-specific OpenAPI corrections after normalization.
 // It never invents operations; it only filters and rewrites auth/server metadata.
 func FixSpec(openAPI3 []byte) ([]byte, error) {
 	var doc map[string]any
@@ -133,61 +132,4 @@ func filterTokenParams(params []any) []any {
 		out = append(out, param)
 	}
 	return out
-}
-
-// CommandTree lists tag/command pairs expected from Restish Method+Path naming.
-func CommandTree(openAPI3 []byte) ([]string, error) {
-	var doc map[string]any
-	if err := json.Unmarshal(openAPI3, &doc); err != nil {
-		return nil, err
-	}
-	paths, _ := doc["paths"].(map[string]any)
-	var entries []string
-	for path, item := range paths {
-		pathItem, _ := item.(map[string]any)
-		for _, method := range []string{"get", "post", "put", "patch", "delete", "head", "options"} {
-			operation, _ := pathItem[method].(map[string]any)
-			if operation == nil {
-				continue
-			}
-			tag := firstTag(operation)
-			command := fallbackOperationName(method, path)
-			entries = append(entries, tag+" "+command)
-		}
-	}
-	sort.Strings(entries)
-	return entries, nil
-}
-
-func firstTag(operation map[string]any) string {
-	tags, _ := operation["tags"].([]any)
-	if len(tags) == 0 {
-		return "api"
-	}
-	return slugify(fmt.Sprint(tags[0]))
-}
-
-func fallbackOperationName(method, path string) string {
-	return slugify(strings.ToLower(method) + "-" + strings.Trim(path, "/"))
-}
-
-func slugify(s string) string {
-	var b strings.Builder
-	lastDash := false
-	for _, r := range s {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
-			if r >= 'A' && r <= 'Z' {
-				b.WriteByte(byte(r - 'A' + 'a'))
-			} else {
-				b.WriteRune(r)
-			}
-			lastDash = false
-			continue
-		}
-		if !lastDash && b.Len() > 0 {
-			b.WriteByte('-')
-			lastDash = true
-		}
-	}
-	return strings.Trim(b.String(), "-")
 }
