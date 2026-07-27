@@ -63,6 +63,9 @@ func TestAuthConfigRejectsSymlinkAndWorldReadable(t *testing.T) {
 	if err := os.WriteFile(wide, []byte("[auth]\nmode=\"token\"\naccess_token=\"x\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Chmod(wide, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := LoadAuthConfig(wide); err == nil || !strings.Contains(err.Error(), "0600") {
 		t.Fatalf("wide file error = %v", err)
 	}
