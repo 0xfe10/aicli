@@ -27,7 +27,7 @@ func TestBearerAuthWritePolicy(t *testing.T) {
 		t.Run(test.mode+test.method, func(t *testing.T) {
 			t.Setenv("FNS_ACCESS_TOKEN", "token")
 			t.Setenv("FNS_WRITE_MODE", test.mode)
-			req, _ := http.NewRequest(test.method, "https://obsidian-fns.kahub.in/api/note", nil)
+			req, _ := http.NewRequest(test.method, "https://fns.example.test/api/note", nil)
 			err := handler.Authenticate(context.Background(), req, restishauth.AuthContext{})
 			if (err != nil) != test.wantError {
 				t.Fatalf("error = %v, wantError=%v", err, test.wantError)
@@ -42,7 +42,7 @@ func TestBearerAuthWritePolicy(t *testing.T) {
 func TestBearerAuthRejectsWriteForceRetry(t *testing.T) {
 	t.Setenv("FNS_ACCESS_TOKEN", "token")
 	t.Setenv("FNS_WRITE_MODE", "write")
-	req, _ := http.NewRequest(http.MethodPost, "https://obsidian-fns.kahub.in/api/note", nil)
+	req, _ := http.NewRequest(http.MethodPost, "https://fns.example.test/api/note", nil)
 	err := (&BearerAuth{}).Authenticate(context.Background(), req, restishauth.AuthContext{Force: true})
 	if err == nil || !strings.Contains(err.Error(), "automatic retry is disabled for writes") {
 		t.Fatalf("error = %v", err)

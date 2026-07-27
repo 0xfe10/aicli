@@ -17,23 +17,26 @@ func TestLoadConfigDefaultsAndOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.BaseURL != DefaultBaseURL {
-		t.Fatalf("BaseURL = %q", cfg.BaseURL)
+	if cfg.BaseURL != "https://fns.example.com" {
+		t.Fatalf("BaseURL = %q, want https://fns.example.com", cfg.BaseURL)
 	}
-	if cfg.SpecURL != DefaultSpecURL {
-		t.Fatalf("SpecURL = %q", cfg.SpecURL)
+	wantSpec := "https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/" + PinnedSpecCommit + "/docs/swagger.yaml"
+	if cfg.SpecURL != wantSpec || DefaultSpecURL != wantSpec {
+		t.Fatalf("SpecURL = %q DefaultSpecURL = %q, want %q", cfg.SpecURL, DefaultSpecURL, wantSpec)
+	}
+	if PinnedSpecCommit != "b6b4566352f39e0404530ed1b58248a815a6d763" {
+		t.Fatalf("PinnedSpecCommit = %q", PinnedSpecCommit)
+	}
+	if PinnedSpecSHA256 != "ae6a880bb9accf472f45d41a922db67617755ce6b7352aef971e7f969ad0d113" {
+		t.Fatalf("PinnedSpecSHA256 = %q", PinnedSpecSHA256)
 	}
 	if cfg.Client != DefaultClient {
 		t.Fatalf("Client = %q", cfg.Client)
-	}
-	if DefaultSpecURL != "https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/3.5.1/docs/swagger.yaml" {
-		t.Fatalf("DefaultSpecURL is not pinned: %s", DefaultSpecURL)
 	}
 
 	if err := SaveAccessToken(ConfigPath(), "file-token"); err != nil {
 		t.Fatal(err)
 	}
-	// Preserve custom base/client by rewriting file.
 	if err := os.WriteFile(ConfigPath(), []byte("base_url = \"https://fns.example.test\"\nclient = \"file-client\"\naccess_token = \"file-token\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +54,7 @@ func TestLoadConfigDefaultsAndOverrides(t *testing.T) {
 	if cfg.BaseURL != "https://fns.example.test" || cfg.Client != "file-client" {
 		t.Fatalf("file config not applied: %#v", cfg)
 	}
-	if cfg.SpecURL != DefaultSpecURL {
+	if cfg.SpecURL != wantSpec {
 		t.Fatalf("SpecURL should remain default without env: %q", cfg.SpecURL)
 	}
 

@@ -7,7 +7,7 @@ implementation:
   package: ./cmd/fns
   command: fns
   transport: embedded-restish-v2.3.0
-  api_description: https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/3.5.1/docs/swagger.yaml
+  api_description: https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/b6b4566352f39e0404530ed1b58248a815a6d763/docs/swagger.yaml
   api_description_format: swagger-2.0
 authentication:
   supported:

@@ -39,8 +39,14 @@ fns-spec-check:
     spec_file="$(mktemp "$(cd "{{ out_dir }}" && pwd)/fns-swagger.XXXXXX.yaml")"
     trap 'rm "$spec_file"' EXIT
     curl --fail --silent --show-error --location \
-      https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/3.5.1/docs/swagger.yaml \
+      https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/b6b4566352f39e0404530ed1b58248a815a6d763/docs/swagger.yaml \
       --output "$spec_file"
+    actual="$(sha256sum "$spec_file" | awk '{print $1}')"
+    expect="ae6a880bb9accf472f45d41a922db67617755ce6b7352aef971e7f969ad0d113"
+    if [[ "$actual" != "$expect" ]]; then
+      echo "pinned FNS swagger SHA256 mismatch: got $actual want $expect" >&2
+      exit 1
+    fi
     FNS_SPEC_CHECK_FILE="$spec_file" \
       go test -run TestPinnedSpecFile -v ./internal/fnsrt
 
@@ -65,23 +71,12 @@ compliance-check:
       done | sort -u
     } > openwiki/compliance/modules-linked.txt
     go mod verify | tee openwiki/compliance/go-mod-verify.txt
-    set +e
-    if command -v govulncheck >/dev/null 2>&1; then
-      govulncheck ./... >openwiki/compliance/govulncheck.txt 2>&1
-    else
-      go run golang.org/x/vuln/cmd/govulncheck@latest ./... >openwiki/compliance/govulncheck.txt 2>&1
-    fi
-    status=$?
-    cat openwiki/compliance/govulncheck.txt
-    set -e
-    # govulncheck exits 3 when findings exist; `go run` may wrap that as 1.
-    if [[ "$status" -eq 0 || "$status" -eq 3 ]]; then
-      exit 0
-    fi
-    if grep -q 'GO-2026-4740' openwiki/compliance/govulncheck.txt; then
-      exit 0
-    fi
-    exit "$status"
+    go tool govulncheck -json ./... > openwiki/compliance/govulncheck.json
+    # Human-readable evidence copy; gate decides pass/fail from JSON.
+    go tool govulncheck ./... > openwiki/compliance/govulncheck.txt 2>&1 || true
+    go run ./internal/compliance/gate \
+      -findings openwiki/compliance/govulncheck.json \
+      -allowlist openwiki/compliance/govulncheck-allowlist.md
 
 test:
     go test ./...

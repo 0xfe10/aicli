@@ -6,14 +6,16 @@ Fast Note Sync API description.
 ## Runtime path
 
 1. Fetch `FNS_SPEC_URL` (default pinned Swagger 2.0 at
-   `https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/3.5.1/docs/swagger.yaml`).
+   `https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/b6b4566352f39e0404530ed1b58248a815a6d763/docs/swagger.yaml`).
 2. `fnsrt.SpecLoader` detects Swagger 2 or OpenAPI 3 (JSON/YAML).
 3. Swagger 2 is converted with `swagger2rt`; OpenAPI 3 is normalized to JSON.
 4. Both formats always run through `FixSpec` before Restish sees the document.
-5. Restish generates tag-grouped commands using Method + Path fallback names.
+5. External OpenAPI `$ref` targets are rejected (remote http(s), `file://`, and
+   relative files for remote specs). Same-document `#/components/...` refs remain.
+6. Restish generates tag-grouped commands using Method + Path fallback names.
 
 Until FNS publishes a stable OpenAPI endpoint (M9), keep the default Spec URL on
-the pinned `3.5.1` tag. Do not switch the default to a branch tip.
+the pinned commit `b6b4566352f39e0404530ed1b58248a815a6d763`. Do not switch the default to a branch tip.
 
 ## Auth and safety
 

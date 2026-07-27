@@ -1,5 +1,5 @@
 surface:
-  source: https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/3.5.1/docs/swagger.yaml
+  source: https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/b6b4566352f39e0404530ed1b58248a815a6d763/docs/swagger.yaml
   generation: runtime
   layout: tags
   naming: restish-method-and-path-fallback

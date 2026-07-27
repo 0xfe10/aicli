@@ -82,8 +82,8 @@ file mode `0600`.
 
 ```sh
 export FNS_ACCESS_TOKEN='...'
-export FNS_BASE_URL='https://obsidian-fns.kahub.in'
-export FNS_SPEC_URL='https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/3.5.1/docs/swagger.yaml'
+export FNS_BASE_URL='https://fns.example.com'
+export FNS_SPEC_URL='https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/b6b4566352f39e0404530ed1b58248a815a6d763/docs/swagger.yaml'
 export FNS_CLIENT='aicli'
 export FNS_WRITE_MODE=write        # also allow POST, PUT, PATCH
 export FNS_WRITE_MODE=destructive  # also allow DELETE / recycle-clear
@@ -99,7 +99,7 @@ go run ./cmd/fns file get-api-file assets/test.png genesis > test.png
 go run ./cmd/fns file post-api-file 'vault: genesis, path: assets/test.bin, file: @./test.bin'
 ```
 
-The default `FNS_SPEC_URL` is pinned to FNS `3.5.1` Swagger until the server
+The default `FNS_SPEC_URL` is pinned to FNS commit `b6b4566352f39e0404530ed1b58248a815a6d763` Swagger until the server
 publishes a stable OpenAPI endpoint. Override `FNS_SPEC_URL` only when you
 intentionally need another description.
 

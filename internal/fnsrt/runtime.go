@@ -12,12 +12,14 @@ import (
 )
 
 const (
-	DefaultBaseURL = "https://obsidian-fns.kahub.in"
-	// Pinned until FNS publishes a stable OpenAPI endpoint (M9). Do not point at
-	// branch tips; released CLIs must not drift with remote docs.
-	DefaultSpecURL = "https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/3.5.1/docs/swagger.yaml"
-	DefaultClient  = "aicli"
-	AuthType       = "fns-bearer"
+	DefaultBaseURL = "https://fns.example.com"
+	// Pinned to an immutable commit until FNS publishes a stable OpenAPI
+	// endpoint (M9). Do not point at mutable tags or branch tips.
+	PinnedSpecCommit = "b6b4566352f39e0404530ed1b58248a815a6d763"
+	PinnedSpecSHA256 = "ae6a880bb9accf472f45d41a922db67617755ce6b7352aef971e7f969ad0d113"
+	DefaultSpecURL   = "https://raw.githubusercontent.com/haierkeys/fast-note-sync-service/" + PinnedSpecCommit + "/docs/swagger.yaml"
+	DefaultClient    = "aicli"
+	AuthType         = "fns-bearer"
 )
 
 // Config bootstraps the embedded Restish runtime for FNS.

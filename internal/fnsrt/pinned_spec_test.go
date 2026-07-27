@@ -1,6 +1,8 @@
 package fnsrt
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,6 +19,11 @@ func TestPinnedSpecFile(t *testing.T) {
 	body, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
+	}
+	sum := sha256.Sum256(body)
+	got := hex.EncodeToString(sum[:])
+	if got != PinnedSpecSHA256 {
+		t.Fatalf("pinned swagger SHA256 = %s, want %s (download content mismatch)", got, PinnedSpecSHA256)
 	}
 	if _, err := ConvertAndFix(body); err != nil {
 		t.Fatal(err)
