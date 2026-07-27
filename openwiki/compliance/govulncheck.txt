@@ -8,8 +8,8 @@ Vulnerability #1: GO-2026-4740
     Fixed in: N/A
     Example traces found:
       #1: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls common.Common.CollectFields
-      #2: internal/pingcodert/loader.go:120:32: pingcodert.ConvertAPIDoc calls json.Marshal, which eventually calls common.init
-      #3: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls common.init
+      #2: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls common.init
+      #3: internal/pingcodert/loader.go:120:32: pingcodert.ConvertAPIDoc calls json.Marshal, which eventually calls common.init
       #4: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decoding.Decode
       #5: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls decoding.init
       #6: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls decoding.init
@@ -69,8 +69,6 @@ Vulnerability #2: GO-2026-4513
       #1: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls msgpack.Unmarshal
 
 Your code is affected by 2 vulnerabilities from 1 module.
-This scan also found 0 vulnerabilities in packages you import and 1
-vulnerability in modules you require, but your code doesn't appear to call these
-vulnerabilities.
+This scan found no other vulnerabilities in packages you import or modules you
+require.
 Use '-show verbose' for more details.
-exit status 3
