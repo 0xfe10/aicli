@@ -1,40 +1,19 @@
 package pingcodert
 
 import (
-	"bufio"
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
+	"github.com/0xfe10/aicli/internal/authflow"
 	restishauth "github.com/rest-sh/restish/v2/auth"
-	"golang.org/x/term"
 )
 
 // AuthIO controls interactive prompts for auth commands. Tests inject fakes.
-type AuthIO struct {
-	Stdin      io.Reader
-	Stdout     io.Writer
-	Stderr     io.Writer
-	ReadSecret func(prompt string) (string, error)
-}
+type AuthIO = authflow.IO
 
 func defaultAuthIO() AuthIO {
-	return AuthIO{
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-		ReadSecret: func(prompt string) (string, error) {
-			fmt.Fprint(os.Stderr, prompt)
-			secret, err := term.ReadPassword(int(os.Stdin.Fd()))
-			fmt.Fprintln(os.Stderr)
-			if err != nil {
-				return "", err
-			}
-			return string(secret), nil
-		},
-	}
+	return authflow.DefaultIO()
 }
 
 // MaybeRunAuth handles `pingcode auth ...` before Restish sees argv.
@@ -49,15 +28,7 @@ func MaybeRunAuth(args []string) (handled bool, err error) {
 
 // RunAuth executes login/status/logout subcommands.
 func RunAuth(args []string, authIO AuthIO) error {
-	if authIO.Stdout == nil {
-		authIO.Stdout = os.Stdout
-	}
-	if authIO.Stderr == nil {
-		authIO.Stderr = os.Stderr
-	}
-	if authIO.Stdin == nil {
-		authIO.Stdin = os.Stdin
-	}
+	authIO = authIO.Normalize()
 	if len(args) == 0 {
 		return fmt.Errorf("usage: pingcode auth login|status|logout")
 	}
@@ -83,8 +54,8 @@ func runAuthLogin(args []string, authIO AuthIO) error {
 			}
 			mode = args[i+1]
 			i++
-		case "--client-secret", "--access-token", "--client-id":
-			return fmt.Errorf("%s is not supported; enter secrets interactively to avoid shell history exposure", args[i])
+		case "--client-secret", "--access-token", "--client-id", "--base-url":
+			return fmt.Errorf("%s is not supported; enter values interactively to avoid shell history exposure", args[i])
 		default:
 			return fmt.Errorf("unknown login flag %q", args[i])
 		}
@@ -103,22 +74,25 @@ func runAuthLogin(args []string, authIO AuthIO) error {
 }
 
 func loginClient(authIO AuthIO) error {
-	clientID, err := promptLine(authIO, "Client ID: ")
+	baseURL, err := authflow.PromptBaseURL(authIO)
+	if err != nil {
+		return err
+	}
+	clientID, err := authflow.PromptLine(authIO, "Client ID: ")
 	if err != nil {
 		return err
 	}
 	if clientID == "" {
 		return fmt.Errorf("Client ID is required")
 	}
-	secret, err := readSecret(authIO, "Client Secret: ")
+	secret, err := authflow.PromptSecret(authIO, "Client Secret: ")
 	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(secret) == "" {
 		return fmt.Errorf("Client Secret is required")
 	}
-	path := ConfigPath()
-	if err := SaveAuthConfig(path, &AuthConfig{
+	if err := SaveLogin(ConfigPath(), baseURL, &AuthConfig{
 		Mode:         AuthModeClient,
 		ClientID:     clientID,
 		ClientSecret: strings.TrimSpace(secret),
@@ -133,15 +107,18 @@ func loginClient(authIO AuthIO) error {
 }
 
 func loginToken(authIO AuthIO) error {
-	token, err := readSecret(authIO, "Access Token: ")
+	baseURL, err := authflow.PromptBaseURL(authIO)
+	if err != nil {
+		return err
+	}
+	token, err := authflow.PromptSecret(authIO, "Access Token: ")
 	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(token) == "" {
 		return fmt.Errorf("Access Token is required")
 	}
-	path := ConfigPath()
-	if err := SaveAuthConfig(path, &AuthConfig{
+	if err := SaveLogin(ConfigPath(), baseURL, &AuthConfig{
 		Mode:        AuthModeToken,
 		AccessToken: strings.TrimSpace(token),
 	}); err != nil {
@@ -154,27 +131,30 @@ func loginToken(authIO AuthIO) error {
 	return nil
 }
 
-type authStatusReport struct {
-	Configured bool   `json:"configured"`
-	Mode       string `json:"mode,omitempty"`
-	Source     string `json:"source,omitempty"`
-	ConfigPath string `json:"configPath,omitempty"`
-}
-
 func runAuthStatus(authIO AuthIO) error {
 	path := ConfigPath()
-	report := authStatusReport{ConfigPath: path}
+	report := authflow.StatusReport{ConfigPath: path}
+
+	baseURL, baseSource, err := ResolveBaseURL(path)
+	if err != nil {
+		return err
+	}
+	if baseURL != "" {
+		report.BaseURL = baseURL
+		report.BaseURLSource = baseSource
+	}
+
 	creds, err := resolveCredentials(path)
 	if err != nil {
 		if strings.Contains(err.Error(), "not configured") {
-			return writeJSON(authIO.Stdout, report)
+			return authflow.WriteJSON(authIO.Stdout, report)
 		}
 		return err
 	}
 	report.Configured = true
 	report.Mode = creds.Mode
-	report.Source = creds.Source
-	return writeJSON(authIO.Stdout, report)
+	report.CredentialSource = creds.Source
+	return authflow.WriteJSON(authIO.Stdout, report)
 }
 
 func runAuthLogout(authIO AuthIO) error {
@@ -190,29 +170,6 @@ func runAuthLogout(authIO AuthIO) error {
 		fmt.Fprintln(authIO.Stderr, "warning: authorization environment variables are still set; this process will continue to use environment authorization")
 	}
 	return nil
-}
-
-func promptLine(authIO AuthIO, prompt string) (string, error) {
-	fmt.Fprint(authIO.Stderr, prompt)
-	reader := bufio.NewReader(authIO.Stdin)
-	line, err := reader.ReadString('\n')
-	if err != nil && err != io.EOF {
-		return "", err
-	}
-	return strings.TrimSpace(line), nil
-}
-
-func readSecret(authIO AuthIO, prompt string) (string, error) {
-	if authIO.ReadSecret != nil {
-		return authIO.ReadSecret(prompt)
-	}
-	return "", fmt.Errorf("secret prompt is unavailable")
-}
-
-func writeJSON(w io.Writer, value any) error {
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(value)
 }
 
 func clearCachedClientCredentialsTokens() error {

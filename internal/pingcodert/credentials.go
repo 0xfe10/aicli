@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/0xfe10/aicli/internal/authflow"
 )
 
 const (
-	CredentialSourceEnvironment = "environment"
-	CredentialSourceConfig      = "config"
+	CredentialSourceEnvironment = authflow.SourceEnvironment
+	CredentialSourceConfig      = authflow.SourceConfig
 )
 
 // Credentials is the resolved authorization material for API requests.
@@ -73,6 +75,29 @@ func resolveCredentials(configPath string) (Credentials, error) {
 	default:
 		return Credentials{}, fmt.Errorf("unsupported auth mode %q in PingCode config", auth.Mode)
 	}
+}
+
+// ResolveBaseURL resolves Base URL with env > config > default precedence.
+func ResolveBaseURL(configPath string) (value, source string, err error) {
+	if env := strings.TrimSpace(os.Getenv("PINGCODE_API_BASE_URL")); env != "" {
+		normalized, err := authflow.NormalizeBaseURL(env)
+		if err != nil {
+			return "", "", fmt.Errorf("PINGCODE_API_BASE_URL: %w", err)
+		}
+		return normalized, authflow.SourceEnvironment, nil
+	}
+	file, err := LoadFileConfig(configPath)
+	if err != nil {
+		return "", "", err
+	}
+	if file.BaseURL != "" {
+		normalized, err := authflow.NormalizeBaseURL(file.BaseURL)
+		if err != nil {
+			return "", "", fmt.Errorf("config base_url: %w", err)
+		}
+		return normalized, authflow.SourceConfig, nil
+	}
+	return DefaultAPIBaseURL, authflow.SourceDefault, nil
 }
 
 // EnvironmentAuthPresent reports whether any auth-related environment variable is set.

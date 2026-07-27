@@ -25,8 +25,12 @@ type Config struct {
 }
 
 func LoadConfig() (Config, error) {
+	baseURL, _, err := ResolveBaseURL(ConfigPath())
+	if err != nil {
+		return Config{}, err
+	}
 	cfg := Config{
-		APIBaseURL: envOr("PINGCODE_API_BASE_URL", DefaultAPIBaseURL),
+		APIBaseURL: baseURL,
 		SpecURL:    envOr("PINGCODE_SPEC_URL", DefaultSpecURL),
 	}
 	if err := validateHTTPURL("PINGCODE_API_BASE_URL", cfg.APIBaseURL); err != nil {

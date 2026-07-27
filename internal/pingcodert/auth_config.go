@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/0xfe10/aicli/internal/authflow"
 	toml "github.com/pelletier/go-toml/v2"
 )
 
@@ -28,8 +29,10 @@ type AuthConfig struct {
 	AccessToken  string `toml:"access_token,omitempty"`
 }
 
-type configFile struct {
-	Auth *AuthConfig `toml:"auth,omitempty"`
+// FileConfig is the persisted PingCode configuration file.
+type FileConfig struct {
+	BaseURL string      `toml:"base_url,omitempty"`
+	Auth    *AuthConfig `toml:"auth,omitempty"`
 }
 
 // ConfigDir returns $XDG_CONFIG_HOME/aicli/pingcode or ~/.config/aicli/pingcode.
@@ -49,60 +52,76 @@ func ConfigPath() string {
 	return filepath.Join(dir, configFileName)
 }
 
-// LoadAuthConfig reads and validates the [auth] section from path.
-// Missing files yield (nil, nil).
-func LoadAuthConfig(path string) (*AuthConfig, error) {
+// LoadFileConfig reads config.toml. Missing files yield an empty config.
+func LoadFileConfig(path string) (FileConfig, error) {
 	if path == "" {
-		return nil, fmt.Errorf("PingCode config path is unavailable")
+		return FileConfig{}, fmt.Errorf("PingCode config path is unavailable")
 	}
 	info, err := os.Lstat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return FileConfig{}, nil
 		}
-		return nil, fmt.Errorf("stat PingCode config: %w", err)
+		return FileConfig{}, fmt.Errorf("stat PingCode config: %w", err)
 	}
 	if err := rejectInsecureFile(path, info); err != nil {
-		return nil, err
+		return FileConfig{}, err
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("read PingCode config: %w", err)
+		return FileConfig{}, fmt.Errorf("read PingCode config: %w", err)
 	}
-	var file configFile
+	if len(strings.TrimSpace(string(data))) == 0 {
+		return FileConfig{}, nil
+	}
+	var file FileConfig
 	if err := toml.Unmarshal(data, &file); err != nil {
-		return nil, fmt.Errorf("parse PingCode config: %w", err)
+		return FileConfig{}, fmt.Errorf("parse PingCode config: %w", err)
 	}
-	if file.Auth == nil {
-		return nil, nil
+	file.BaseURL = strings.TrimSpace(file.BaseURL)
+	if file.Auth != nil {
+		if err := validateAuthConfig(file.Auth); err != nil {
+			return FileConfig{}, err
+		}
 	}
-	if err := validateAuthConfig(file.Auth); err != nil {
+	return file, nil
+}
+
+// LoadAuthConfig reads and validates the [auth] section from path.
+// Missing files yield (nil, nil).
+func LoadAuthConfig(path string) (*AuthConfig, error) {
+	file, err := LoadFileConfig(path)
+	if err != nil {
 		return nil, err
 	}
 	return file.Auth, nil
 }
 
-// SaveAuthConfig atomically writes auth into config.toml with 0600 permissions.
-func SaveAuthConfig(path string, auth *AuthConfig) error {
+// SaveLogin atomically writes base_url and [auth] into config.toml.
+func SaveLogin(path, baseURL string, auth *AuthConfig) error {
 	if path == "" {
 		return fmt.Errorf("PingCode config path is unavailable")
+	}
+	normalized, err := authflow.NormalizeBaseURL(baseURL)
+	if err != nil {
+		return err
 	}
 	if err := validateAuthConfig(auth); err != nil {
 		return err
 	}
-	dir := filepath.Dir(path)
-	if err := ensureSecureDir(dir); err != nil {
+	if err := ensureSecureDir(filepath.Dir(path)); err != nil {
 		return err
 	}
-	file, err := loadConfigFile(path)
+	file, err := LoadFileConfig(path)
 	if err != nil {
 		return err
 	}
+	file.BaseURL = normalized
 	file.Auth = auth
 	return writeConfigFileAtomic(path, file)
 }
 
-// ClearAuthConfig removes the [auth] section while preserving other keys.
+// ClearAuthConfig removes the [auth] section while preserving base_url.
 func ClearAuthConfig(path string) error {
 	if path == "" {
 		return fmt.Errorf("PingCode config path is unavailable")
@@ -117,7 +136,7 @@ func ClearAuthConfig(path string) error {
 	if err := rejectInsecureFile(path, info); err != nil {
 		return err
 	}
-	file, err := loadConfigFile(path)
+	file, err := LoadFileConfig(path)
 	if err != nil {
 		return err
 	}
@@ -155,32 +174,7 @@ func validateAuthConfig(auth *AuthConfig) error {
 	return nil
 }
 
-func loadConfigFile(path string) (configFile, error) {
-	info, err := os.Lstat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return configFile{}, nil
-		}
-		return configFile{}, fmt.Errorf("stat PingCode config: %w", err)
-	}
-	if err := rejectInsecureFile(path, info); err != nil {
-		return configFile{}, err
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return configFile{}, fmt.Errorf("read PingCode config: %w", err)
-	}
-	if len(strings.TrimSpace(string(data))) == 0 {
-		return configFile{}, nil
-	}
-	var file configFile
-	if err := toml.Unmarshal(data, &file); err != nil {
-		return configFile{}, fmt.Errorf("parse PingCode config: %w", err)
-	}
-	return file, nil
-}
-
-func writeConfigFileAtomic(path string, file configFile) error {
+func writeConfigFileAtomic(path string, file FileConfig) error {
 	dir := filepath.Dir(path)
 	if err := ensureSecureDir(dir); err != nil {
 		return err

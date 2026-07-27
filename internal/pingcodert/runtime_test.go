@@ -192,13 +192,18 @@ func TestEmbeddedRestishUsesConfigFileClientCredentials(t *testing.T) {
 	t.Setenv("PINGCODE_ACCESS_TOKEN", "")
 	t.Setenv("PINGCODE_CLIENT_ID", "")
 	t.Setenv("PINGCODE_CLIENT_SECRET", "")
-	if err := SaveAuthConfig(ConfigPath(), &AuthConfig{
+	if err := SaveLogin(ConfigPath(), server.URL, &AuthConfig{
 		Mode: AuthModeClient, ClientID: "file-client", ClientSecret: "file-secret",
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	out := runTestCLI(t, Config{APIBaseURL: server.URL, SpecURL: server.URL + "/api_data.json"}, "", []string{
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.SpecURL = server.URL + "/api_data.json"
+	out := runTestCLI(t, cfg, "", []string{
 		"pingcode", "pjm", "get-projects", "-o", "json",
 	})
 	if !strings.Contains(out, `"ok": true`) {
@@ -231,12 +236,13 @@ func TestEmbeddedRestishEnvOverridesConfigFile(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", xdg)
 	t.Setenv("RSH_CONFIG_DIR", filepath.Join(xdg, "aicli", "pingcode"))
 	t.Setenv("RSH_CACHE_DIR", filepath.Join(xdg, "cache"))
-	if err := SaveAuthConfig(ConfigPath(), &AuthConfig{
+	if err := SaveLogin(ConfigPath(), "https://file.pingcode.test", &AuthConfig{
 		Mode: AuthModeClient, ClientID: "file-client", ClientSecret: "file-secret",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PINGCODE_ACCESS_TOKEN", "env-override")
+	t.Setenv("PINGCODE_API_BASE_URL", server.URL)
 
 	out := runTestCLI(t, Config{APIBaseURL: server.URL, SpecURL: server.URL + "/api_data.json"}, "", []string{
 		"pingcode", "pjm", "get-projects", "-o", "json",
@@ -272,11 +278,16 @@ func TestEmbeddedRestishUsesConfigFileAccessToken(t *testing.T) {
 	t.Setenv("PINGCODE_ACCESS_TOKEN", "")
 	t.Setenv("PINGCODE_CLIENT_ID", "")
 	t.Setenv("PINGCODE_CLIENT_SECRET", "")
-	if err := SaveAuthConfig(ConfigPath(), &AuthConfig{Mode: AuthModeToken, AccessToken: "file-access-token"}); err != nil {
+	if err := SaveLogin(ConfigPath(), server.URL, &AuthConfig{Mode: AuthModeToken, AccessToken: "file-access-token"}); err != nil {
 		t.Fatal(err)
 	}
 
-	out := runTestCLI(t, Config{APIBaseURL: server.URL, SpecURL: server.URL + "/api_data.json"}, "", []string{
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.SpecURL = server.URL + "/api_data.json"
+	out := runTestCLI(t, cfg, "", []string{
 		"pingcode", "pjm", "get-projects", "-o", "json",
 	})
 	if !strings.Contains(out, `"source": "file-token"`) {

@@ -5,24 +5,29 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 
+	"github.com/0xfe10/aicli/internal/authflow"
 	restishauth "github.com/rest-sh/restish/v2/auth"
 )
+
+func umask(mask int) int { return syscall.Umask(mask) }
 
 func TestAuthConfigRoundTripClientAndToken(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	path := ConfigPath()
 
-	if err := SaveAuthConfig(path, &AuthConfig{
+	if err := SaveLogin(path, "https://open.pingcode.com/", &AuthConfig{
 		Mode: AuthModeClient, ClientID: "id", ClientSecret: "secret",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := LoadAuthConfig(path)
-	if err != nil || got.Mode != AuthModeClient || got.ClientID != "id" || got.ClientSecret != "secret" {
-		t.Fatalf("client load = %#v err=%v", got, err)
+	file, err := LoadFileConfig(path)
+	if err != nil || file.BaseURL != "https://open.pingcode.com" || file.Auth == nil ||
+		file.Auth.Mode != AuthModeClient || file.Auth.ClientID != "id" || file.Auth.ClientSecret != "secret" {
+		t.Fatalf("client load = %#v err=%v", file, err)
 	}
 	info, err := os.Stat(path)
 	if err != nil {
@@ -39,10 +44,10 @@ func TestAuthConfigRoundTripClientAndToken(t *testing.T) {
 		t.Fatalf("dir perm = %o", dirInfo.Mode().Perm())
 	}
 
-	if err := SaveAuthConfig(path, &AuthConfig{Mode: AuthModeToken, AccessToken: "tok"}); err != nil {
+	if err := SaveLogin(path, "https://open.pingcode.com", &AuthConfig{Mode: AuthModeToken, AccessToken: "tok"}); err != nil {
 		t.Fatal(err)
 	}
-	got, err = LoadAuthConfig(path)
+	got, err := LoadAuthConfig(path)
 	if err != nil || got.Mode != AuthModeToken || got.AccessToken != "tok" || got.ClientID != "" {
 		t.Fatalf("token load = %#v err=%v", got, err)
 	}
@@ -60,7 +65,7 @@ func TestAuthConfigRejectsSymlinkAndWorldReadable(t *testing.T) {
 	}
 
 	wide := path + ".wide"
-	if err := os.WriteFile(wide, []byte("[auth]\nmode=\"token\"\naccess_token=\"x\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(wide, []byte("base_url=\"https://open.pingcode.com\"\n[auth]\nmode=\"token\"\naccess_token=\"x\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chmod(wide, 0o644); err != nil {
@@ -71,7 +76,7 @@ func TestAuthConfigRejectsSymlinkAndWorldReadable(t *testing.T) {
 	}
 
 	target := path + ".target"
-	if err := os.WriteFile(target, []byte("[auth]\nmode=\"token\"\naccess_token=\"x\"\n"), 0o600); err != nil {
+	if err := os.WriteFile(target, []byte("base_url=\"https://open.pingcode.com\"\n[auth]\nmode=\"token\"\naccess_token=\"x\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	link := path + ".link"
@@ -83,14 +88,14 @@ func TestAuthConfigRejectsSymlinkAndWorldReadable(t *testing.T) {
 	}
 }
 
-func TestAuthConfigAtomicReplaceAndClear(t *testing.T) {
+func TestAuthConfigAtomicReplaceAndClearPreservesBaseURL(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	path := ConfigPath()
-	if err := SaveAuthConfig(path, &AuthConfig{Mode: AuthModeToken, AccessToken: "one"}); err != nil {
+	if err := SaveLogin(path, "https://open.pingcode.com", &AuthConfig{Mode: AuthModeToken, AccessToken: "one"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := SaveAuthConfig(path, &AuthConfig{Mode: AuthModeToken, AccessToken: "two"}); err != nil {
+	if err := SaveLogin(path, "https://open.pingcode.com", &AuthConfig{Mode: AuthModeToken, AccessToken: "two"}); err != nil {
 		t.Fatal(err)
 	}
 	got, err := LoadAuthConfig(path)
@@ -100,9 +105,35 @@ func TestAuthConfigAtomicReplaceAndClear(t *testing.T) {
 	if err := ClearAuthConfig(path); err != nil {
 		t.Fatal(err)
 	}
-	got, err = LoadAuthConfig(path)
-	if err != nil || got != nil {
-		t.Fatalf("cleared=%#v err=%v", got, err)
+	file, err := LoadFileConfig(path)
+	if err != nil || file.Auth != nil || file.BaseURL != "https://open.pingcode.com" {
+		t.Fatalf("cleared=%#v err=%v", file, err)
+	}
+}
+
+func TestAuthLoginEmptyInputDoesNotModifyConfig(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	path := ConfigPath()
+	if err := SaveLogin(path, "https://open.pingcode.com", &AuthConfig{Mode: AuthModeToken, AccessToken: "keep-me"}); err != nil {
+		t.Fatal(err)
+	}
+	var stdout strings.Builder
+	err := RunAuth([]string{"login", "--mode", "token"}, AuthIO{
+		Stdin:  strings.NewReader("\n"),
+		Stdout: &stdout,
+		Stderr: &stdout,
+		ReadSecret: func(string) (string, error) {
+			t.Fatal("secret should not be prompted when Base URL is empty")
+			return "", nil
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "Base URL is required") {
+		t.Fatalf("error = %v", err)
+	}
+	file, loadErr := LoadFileConfig(path)
+	if loadErr != nil || file.Auth == nil || file.Auth.AccessToken != "keep-me" {
+		t.Fatalf("config mutated: %#v err=%v", file, loadErr)
 	}
 }
 
@@ -110,7 +141,7 @@ func TestResolveCredentialsPrecedence(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	path := ConfigPath()
-	if err := SaveAuthConfig(path, &AuthConfig{Mode: AuthModeClient, ClientID: "file-id", ClientSecret: "file-secret"}); err != nil {
+	if err := SaveLogin(path, "https://open.pingcode.com", &AuthConfig{Mode: AuthModeClient, ClientID: "file-id", ClientSecret: "file-secret"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -139,10 +170,32 @@ func TestResolveCredentialsPrecedence(t *testing.T) {
 		t.Fatalf("env token=%#v err=%v", creds, err)
 	}
 
-	// Environment must not mutate the file.
 	fileAuth, err := LoadAuthConfig(path)
 	if err != nil || fileAuth.ClientID != "file-id" {
 		t.Fatalf("file mutated: %#v err=%v", fileAuth, err)
+	}
+}
+
+func TestResolveBaseURLPrecedence(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("PINGCODE_API_BASE_URL", "")
+	path := ConfigPath()
+	if err := SaveLogin(path, "https://file.pingcode.test", &AuthConfig{Mode: AuthModeToken, AccessToken: "tok"}); err != nil {
+		t.Fatal(err)
+	}
+	got, source, err := ResolveBaseURL(path)
+	if err != nil || got != "https://file.pingcode.test" || source != authflow.SourceConfig {
+		t.Fatalf("config base=%q source=%q err=%v", got, source, err)
+	}
+	t.Setenv("PINGCODE_API_BASE_URL", "https://env.pingcode.test/")
+	got, source, err = ResolveBaseURL(path)
+	if err != nil || got != "https://env.pingcode.test" || source != authflow.SourceEnvironment {
+		t.Fatalf("env base=%q source=%q err=%v", got, source, err)
+	}
+	cfg, err := LoadConfig()
+	if err != nil || cfg.APIBaseURL != "https://env.pingcode.test" {
+		t.Fatalf("LoadConfig=%#v err=%v", cfg, err)
 	}
 }
 
@@ -152,8 +205,9 @@ func TestAuthStatusDoesNotLeakSecrets(t *testing.T) {
 	t.Setenv("PINGCODE_ACCESS_TOKEN", "")
 	t.Setenv("PINGCODE_CLIENT_ID", "")
 	t.Setenv("PINGCODE_CLIENT_SECRET", "")
+	t.Setenv("PINGCODE_API_BASE_URL", "")
 	secret := "super-secret-value"
-	if err := SaveAuthConfig(ConfigPath(), &AuthConfig{Mode: AuthModeClient, ClientID: "id", ClientSecret: secret}); err != nil {
+	if err := SaveLogin(ConfigPath(), "https://open.pingcode.com", &AuthConfig{Mode: AuthModeClient, ClientID: "id", ClientSecret: secret}); err != nil {
 		t.Fatal(err)
 	}
 	var stdout, stderr strings.Builder
@@ -164,7 +218,10 @@ func TestAuthStatusDoesNotLeakSecrets(t *testing.T) {
 	if strings.Contains(out, secret) || strings.Contains(out, "client_id") || strings.Contains(out, "client_secret") {
 		t.Fatalf("status leaked secrets: %s", out)
 	}
-	if !strings.Contains(out, `"configured": true`) || !strings.Contains(out, `"source": "config"`) {
+	if !strings.Contains(out, `"configured": true`) ||
+		!strings.Contains(out, `"credentialSource": "config"`) ||
+		!strings.Contains(out, `"baseUrl": "https://open.pingcode.com"`) ||
+		!strings.Contains(out, `"baseUrlSource": "config"`) {
 		t.Fatalf("status = %s", out)
 	}
 }
@@ -190,7 +247,7 @@ func TestAuthLoginLogoutClearsTokenCache(t *testing.T) {
 
 	var stdout strings.Builder
 	err := RunAuth([]string{"login", "--mode", "client"}, AuthIO{
-		Stdin:  strings.NewReader("id\n"),
+		Stdin:  strings.NewReader("https://open.pingcode.com\nid\n"),
 		Stdout: &stdout,
 		Stderr: &stdout,
 		ReadSecret: func(string) (string, error) {
@@ -199,6 +256,10 @@ func TestAuthLoginLogoutClearsTokenCache(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	file, err := LoadFileConfig(ConfigPath())
+	if err != nil || file.BaseURL != "https://open.pingcode.com" || file.Auth == nil || file.Auth.ClientID != "id" {
+		t.Fatalf("login file=%#v err=%v", file, err)
 	}
 	got, err := cache.Get(key)
 	if err != nil {
@@ -219,9 +280,9 @@ func TestAuthLoginLogoutClearsTokenCache(t *testing.T) {
 	if err != nil || got != nil {
 		t.Fatalf("expected cache clear after logout, got %#v err=%v", got, err)
 	}
-	auth, err := LoadAuthConfig(ConfigPath())
-	if err != nil || auth != nil {
-		t.Fatalf("auth after logout = %#v err=%v", auth, err)
+	file, err = LoadFileConfig(ConfigPath())
+	if err != nil || file.Auth != nil || file.BaseURL != "https://open.pingcode.com" {
+		t.Fatalf("after logout = %#v err=%v", file, err)
 	}
 }
 
@@ -237,5 +298,33 @@ func TestAuthErrorsDoNotContainSecrets(t *testing.T) {
 	err := validateAuthConfig(&AuthConfig{Mode: AuthModeClient, ClientID: "", ClientSecret: secret})
 	if err == nil || strings.Contains(err.Error(), secret) {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestAuthConfigPermissionsIgnoreUmask(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix permission checks")
+	}
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	mask := umask(0o077)
+	defer umask(mask)
+	path := ConfigPath()
+	if err := SaveLogin(path, "https://open.pingcode.com", &AuthConfig{Mode: AuthModeToken, AccessToken: "tok"}); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("file perm = %o", info.Mode().Perm())
+	}
+	dirInfo, err := os.Stat(filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dirInfo.Mode().Perm() != 0o700 {
+		t.Fatalf("dir perm = %o", dirInfo.Mode().Perm())
 	}
 }
