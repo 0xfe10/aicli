@@ -73,10 +73,10 @@ func (s *Service) GetSchema(ctx context.Context, kind *WorkItemKind, projectIden
 		return nil, err
 	}
 	flows := []map[string]any{}
-	if plans, planErr := s.client.GetWorkItemStatePlans(ctx, project.ID); planErr == nil {
+	if plans, planErr := s.listStatePlans(ctx, project.ID); planErr == nil {
 		if plan := findStatePlan(plans, project, typ); plan != nil && len(states) > 0 {
 			for _, st := range states {
-				if edges, flowErr := s.client.GetWorkItemStateFlows(ctx, plan.ID, st.ID); flowErr == nil {
+				if edges, flowErr := s.listStateFlows(ctx, plan.ID, st.ID); flowErr == nil {
 					flows = append(flows, map[string]any{
 						"fromState": map[string]any{"id": st.ID, "name": st.Name},
 						"to":        summarizeFlows(edges, states),
@@ -119,19 +119,30 @@ func (s *Service) GetWorkItemDetail(ctx context.Context, kind WorkItemKind, work
 	if !includeComments {
 		return map[string]any{"target": detail}, nil
 	}
-	page, err := s.client.ListWorkItemComments(ctx, item.ID)
+	var apiTotal int
+	comments, truncated, err := listAllPagesSoft(ctx, "comments", func(pageIndex, pageSize int) (int, []Comment, error) {
+		page, err := s.client.ListWorkItemComments(ctx, item.ID, pageIndex, pageSize)
+		if err == nil && page.Total > 0 {
+			apiTotal = page.Total
+		}
+		return page.Total, page.Values, err
+	})
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{
+	total := len(comments)
+	if apiTotal > total {
+		total = apiTotal
+	}
+	out := map[string]any{
 		"target": detail,
 		"comments": map[string]any{
-			"total":     page.Total,
-			"pageIndex": page.PageIndex,
-			"pageSize":  page.PageSize,
-			"values":    page.Values,
+			"total":     total,
+			"truncated": truncated,
+			"values":    comments,
 		},
-	}, nil
+	}
+	return out, nil
 }
 
 // SearchOptions configures work-item search.
@@ -744,15 +755,28 @@ func normalizePageBounds(pageIndex, pageSize int) (int, int, error) {
 type pageFetcher[T any] func(pageIndex, pageSize int) (total int, values []T, err error)
 
 func listAllPages[T any](ctx context.Context, resource string, fetch pageFetcher[T]) ([]T, error) {
+	all, truncated, err := listAllPagesSoft(ctx, resource, fetch)
+	if err != nil {
+		return nil, err
+	}
+	if truncated {
+		return nil, NewError(CodeUpstreamError, fmt.Sprintf("%s 超过最大分页上限 %d 页（page_size=%d），结果可能不完整", resource, maxListPages, defaultDiscoveryPageSize))
+	}
+	return all, nil
+}
+
+// listAllPagesSoft paginates until exhausted or maxListPages; truncated=true when the ceiling is hit.
+func listAllPagesSoft[T any](ctx context.Context, resource string, fetch pageFetcher[T]) ([]T, bool, error) {
+	_ = resource
 	var all []T
 	seen := map[string]struct{}{}
 	for pageIndex := 0; pageIndex < maxListPages; pageIndex++ {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		total, values, err := fetch(pageIndex, defaultDiscoveryPageSize)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		for _, v := range values {
 			id := entityID(v)
@@ -765,16 +789,34 @@ func listAllPages[T any](ctx context.Context, resource string, fetch pageFetcher
 			all = append(all, v)
 		}
 		if len(values) == 0 {
-			return all, nil
+			return all, false, nil
 		}
-		if total > 0 && len(all) >= total {
-			return all, nil
+		if total > 0 {
+			if len(all) >= total {
+				return all, false, nil
+			}
+			// Prefer API total over page-size heuristics; some tenants return short pages.
+			continue
 		}
 		if len(values) < defaultDiscoveryPageSize {
-			return all, nil
+			return all, false, nil
 		}
 	}
-	return nil, NewError(CodeUpstreamError, fmt.Sprintf("%s 超过最大分页上限 %d 页（page_size=%d），结果可能不完整", resource, maxListPages, defaultDiscoveryPageSize))
+	return all, true, nil
+}
+
+func (s *Service) listStatePlans(ctx context.Context, projectID string) ([]WorkItemStatePlan, error) {
+	return listAllPages(ctx, "work_item_state_plans", func(pageIndex, pageSize int) (int, []WorkItemStatePlan, error) {
+		page, err := s.client.ListWorkItemStatePlans(ctx, projectID, pageIndex, pageSize)
+		return page.Total, page.Values, err
+	})
+}
+
+func (s *Service) listStateFlows(ctx context.Context, statePlanID, fromStateID string) ([]WorkItemStateFlow, error) {
+	return listAllPages(ctx, "work_item_state_flows", func(pageIndex, pageSize int) (int, []WorkItemStateFlow, error) {
+		page, err := s.client.ListWorkItemStateFlows(ctx, statePlanID, fromStateID, pageIndex, pageSize)
+		return page.Total, page.Values, err
+	})
 }
 
 func entityID(v any) string {
@@ -796,6 +838,13 @@ func entityID(v any) string {
 		return typed.ID
 	case Comment:
 		return typed.ID
+	case WorkItemStatePlan:
+		return typed.ID
+	case WorkItemStateFlow:
+		if typed.ID != "" {
+			return typed.ID
+		}
+		return typed.FromStateID + "->" + typed.ToStateID
 	}
 	return ""
 }
@@ -1167,7 +1216,7 @@ func (s *Service) resolveLegalTransitions(ctx context.Context, schema SchemaCont
 	if currentStateID == "" {
 		return fallback, nil
 	}
-	plans, err := s.client.GetWorkItemStatePlans(ctx, schema.Project.ID)
+	plans, err := s.listStatePlans(ctx, schema.Project.ID)
 	if err != nil {
 		return fallback, nil
 	}
@@ -1175,7 +1224,7 @@ func (s *Service) resolveLegalTransitions(ctx context.Context, schema SchemaCont
 	if plan == nil {
 		return fallback, nil
 	}
-	flows, err := s.client.GetWorkItemStateFlows(ctx, plan.ID, currentStateID)
+	flows, err := s.listStateFlows(ctx, plan.ID, currentStateID)
 	if err != nil {
 		return fallback, nil
 	}

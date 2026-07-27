@@ -1,6 +1,6 @@
 # PingCode shadow validation gate
 
-Status: **v0.1.4 in progress — M1/M2 security+write/pagination fixes landed; full E2E apply/MCP oracle still gated**
+Status: **v0.1.5 — Justfile/raw-timeout/umask/comments pagination fixes; full E2E apply/MCP oracle still gated (M4)**
 
 This gate is required before release. Do not publish until both route families
 and controlled writes succeed against a real tenant.
@@ -107,8 +107,9 @@ Real-tenant defects found and fixed during validation:
 
 Remaining release-gate checks:
 
-- Download `v0.1.4` Release artifact and run `just pingcode-release-verify` /
-  `pingcode-shadow-*` against it.
+- Download `v0.1.5` Release artifact and run `just pingcode-release-verify` /
+  `pingcode-shadow-*` against it (set `PINGCODE_ARCHIVE` / `PINGCODE_CHECKSUMS` /
+  `PINGCODE_EXPECT_VERSION` / `PINGCODE_EXPECT_COMMIT`).
 - Provide dedicated test project with members, requirement type, and OAuth user.
 - Pin MCP oracle image digest/commit; fix or bypass `get_work_item` timestamp schema.
 - Controlled `--apply` twin-ticket compare with runId lifecycle (no blind retries).
@@ -154,3 +155,14 @@ Code-level gates landed before the next Release artifact:
 - Local `pageIndex`/`pageSize`/`PINGCODE_TIMEOUT_MS` bounds checks.
 - Justfile recipes: `pingcode-shadow-preflight|read|dry-run|apply`,
   `pingcode-release-verify` (apply requires `PINGCODE_E2E_APPLY=1`).
+
+## 2026-07-27 v0.1.5 unblockers
+
+- Justfile recipe bodies no longer use unindented Python heredocs; `just --list`
+  / `just verify` parse again (v0.1.4 Release failed on this).
+- `raw` uses an HTTP client with `PINGCODE_TIMEOUT_MS` (not the fixed 30s default).
+- Shadow dry-run covers create/update/transition/comment plus before/after GET
+  zero-write compare; apply covers create/update/transition/comment with GET
+  checkpoints; release-verify checks archive/checksum/version/commit when env set.
+- Token permission test forces `chmod 0644` after write so umask 0077 cannot flake.
+- Comments and state plans/flows paginate; comments expose `truncated`.

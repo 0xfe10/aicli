@@ -203,23 +203,21 @@ func (c *Client) ListProjectMembers(ctx context.Context, projectID string, pageI
 	return out, err
 }
 
-func (c *Client) GetWorkItemStatePlans(ctx context.Context, projectID string) ([]WorkItemStatePlan, error) {
+func (c *Client) ListWorkItemStatePlans(ctx context.Context, projectID string, pageIndex, pageSize int) (PageResponse[WorkItemStatePlan], error) {
 	q := url.Values{"project_id": {projectID}}
-	var page PageResponse[WorkItemStatePlan]
-	if err := c.request(ctx, http.MethodGet, pathWorkItemStatePlans, q, nil, true, &page); err != nil {
-		return nil, err
-	}
-	return page.Values, nil
+	setPage(q, pageIndex, pageSize)
+	var out PageResponse[WorkItemStatePlan]
+	err := c.request(ctx, http.MethodGet, pathWorkItemStatePlans, q, nil, true, &out)
+	return out, err
 }
 
-func (c *Client) GetWorkItemStateFlows(ctx context.Context, statePlanID, fromStateID string) ([]WorkItemStateFlow, error) {
+func (c *Client) ListWorkItemStateFlows(ctx context.Context, statePlanID, fromStateID string, pageIndex, pageSize int) (PageResponse[WorkItemStateFlow], error) {
 	q := url.Values{"from_state_id": {fromStateID}}
+	setPage(q, pageIndex, pageSize)
 	path := fmt.Sprintf("%s/%s/work_item_state_flows", pathWorkItemStatePlans, url.PathEscape(statePlanID))
-	var page PageResponse[WorkItemStateFlow]
-	if err := c.request(ctx, http.MethodGet, path, q, nil, true, &page); err != nil {
-		return nil, err
-	}
-	return page.Values, nil
+	var out PageResponse[WorkItemStateFlow]
+	err := c.request(ctx, http.MethodGet, path, q, nil, true, &out)
+	return out, err
 }
 
 func (c *Client) ListWorkItems(ctx context.Context, query WorkItemListQuery) (PageResponse[WorkItem], error) {
@@ -278,11 +276,12 @@ func (c *Client) UpdateWorkItem(ctx context.Context, workItemID string, payload 
 	return out, err
 }
 
-func (c *Client) ListWorkItemComments(ctx context.Context, workItemID string) (PageResponse[Comment], error) {
+func (c *Client) ListWorkItemComments(ctx context.Context, workItemID string, pageIndex, pageSize int) (PageResponse[Comment], error) {
 	q := url.Values{
 		"principal_type": {"work_item"},
 		"principal_id":   {workItemID},
 	}
+	setPage(q, pageIndex, pageSize)
 	var out PageResponse[Comment]
 	err := c.request(ctx, http.MethodGet, pathComments, q, nil, true, &out)
 	return out, err

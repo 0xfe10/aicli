@@ -102,6 +102,10 @@ func TestTokenFileRejectsOpenPermissionsAndSymlink(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"accessToken":"t","tokenType":"Bearer","savedAt":1}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// Force mode after write: umask (e.g. 0077) can silently produce 0600.
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	store := pingcode.NewAuthStore(path)
 	if _, err := store.Get(); err == nil {
 		t.Fatal("expected permissions error")

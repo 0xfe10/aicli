@@ -232,3 +232,134 @@ func TestAuthLoginAndComplete(t *testing.T) {
 		t.Fatalf("token not saved: %#v", got)
 	}
 }
+
+func TestGetWorkItemCommentsPaginate(t *testing.T) {
+	var commentPages atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/auth/token":
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "t", "expires_in": 3600})
+		case r.URL.Path == "/v1/project/projects":
+			_ = json.NewEncoder(w).Encode(page([]any{map[string]any{"id": "p1", "name": "Demo", "identifier": "DEMO"}}))
+		case r.URL.Path == "/v1/project/work_item/types":
+			_ = json.NewEncoder(w).Encode(page([]any{map[string]any{"id": "bug", "name": "缺陷"}}))
+		case r.URL.Path == "/v1/project/work_item/states":
+			_ = json.NewEncoder(w).Encode(page([]any{map[string]any{"id": "s1", "name": "新提交"}}))
+		case r.URL.Path == "/v1/project/work_item/priorities":
+			_ = json.NewEncoder(w).Encode(page([]any{}))
+		case strings.HasSuffix(r.URL.Path, "/members"):
+			_ = json.NewEncoder(w).Encode(page([]any{}))
+		case r.URL.Path == "/v1/project/work_items" && r.Method == http.MethodGet:
+			_ = json.NewEncoder(w).Encode(page([]any{map[string]any{
+				"id": "wi1", "identifier": "DEMO-1", "title": "Bug", "state": map[string]any{"id": "s1", "name": "新提交"},
+			}}))
+		case strings.HasPrefix(r.URL.Path, "/v1/project/work_items/"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id": "wi1", "identifier": "DEMO-1", "title": "Bug", "state": map[string]any{"id": "s1", "name": "新提交"},
+			})
+		case r.URL.Path == "/v1/comments":
+			commentPages.Add(1)
+			idx := r.URL.Query().Get("page_index")
+			if idx == "" || idx == "0" {
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"page_size": 100, "page_index": 0, "total": 2,
+					"values": []any{map[string]any{"id": "c1", "content": "first"}},
+				})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"page_size": 100, "page_index": 1, "total": 2,
+				"values": []any{map[string]any{"id": "c2", "content": "second"}},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	t.Setenv("PINGCODE_API_BASE_URL", srv.URL)
+	t.Setenv("PINGCODE_BASE_URL", "https://example.pingcode.com")
+	t.Setenv("PINGCODE_CLIENT_ID", "cid")
+	t.Setenv("PINGCODE_CLIENT_SECRET", "csecret")
+	t.Setenv("PINGCODE_AUTH_TOKEN_PATH", filepath.Join(dir, "auth.json"))
+	t.Setenv("PINGCODE_PROJECT_IDENTIFIER", "DEMO")
+
+	var stdout bytes.Buffer
+	result := pingcode.Execute(context.Background(), []string{
+		"work-item", "get", "--kind", "bug", "--identifier", "DEMO-1", "--include-comments",
+	}, pingcode.RuntimeDependencies{Stdout: &stdout})
+	if result.ExitCode != cli.ExitOK {
+		t.Fatalf("exit=%d out=%s", result.ExitCode, stdout.String())
+	}
+	if commentPages.Load() < 2 {
+		t.Fatalf("expected multi-page comment fetch, pages=%d out=%s", commentPages.Load(), stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"c1"`) || !strings.Contains(stdout.String(), `"c2"`) {
+		t.Fatalf("expected both comments: %s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"truncated": false`) && !strings.Contains(stdout.String(), `"truncated":false`) {
+		t.Fatalf("expected truncated=false: %s", stdout.String())
+	}
+}
+
+func TestStatePlansPaginate(t *testing.T) {
+	var planPages atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/auth/token":
+			_ = json.NewEncoder(w).Encode(map[string]any{"access_token": "t", "expires_in": 3600})
+		case r.URL.Path == "/v1/project/projects":
+			_ = json.NewEncoder(w).Encode(page([]any{map[string]any{"id": "p1", "name": "Demo", "identifier": "DEMO", "type": "kanban"}}))
+		case r.URL.Path == "/v1/project/work_item/types":
+			_ = json.NewEncoder(w).Encode(page([]any{map[string]any{"id": "bug", "name": "缺陷"}}))
+		case r.URL.Path == "/v1/project/work_item/states":
+			_ = json.NewEncoder(w).Encode(page([]any{map[string]any{"id": "s1", "name": "新提交"}, map[string]any{"id": "s2", "name": "处理中"}}))
+		case r.URL.Path == "/v1/project/work_item/priorities":
+			_ = json.NewEncoder(w).Encode(page([]any{}))
+		case strings.HasSuffix(r.URL.Path, "/members"):
+			_ = json.NewEncoder(w).Encode(page([]any{}))
+		case r.URL.Path == "/v1/project/work_item_state_plans":
+			planPages.Add(1)
+			idx := r.URL.Query().Get("page_index")
+			if idx == "" || idx == "0" {
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"page_size": 100, "page_index": 0, "total": 2,
+					"values": []any{map[string]any{"id": "plan1", "name": "bug-plan", "work_item_type": "bug"}},
+				})
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"page_size": 100, "page_index": 1, "total": 2,
+				"values": []any{map[string]any{"id": "plan2", "name": "other", "work_item_type": "req"}},
+			})
+		case strings.Contains(r.URL.Path, "/work_item_state_flows"):
+			_ = json.NewEncoder(w).Encode(page([]any{
+				map[string]any{"id": "f1", "from_state_id": "s1", "to_state_id": "s2", "to_state": map[string]any{"id": "s2", "name": "处理中"}},
+			}))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	dir := t.TempDir()
+	t.Setenv("PINGCODE_API_BASE_URL", srv.URL)
+	t.Setenv("PINGCODE_BASE_URL", "https://example.pingcode.com")
+	t.Setenv("PINGCODE_CLIENT_ID", "cid")
+	t.Setenv("PINGCODE_CLIENT_SECRET", "csecret")
+	t.Setenv("PINGCODE_AUTH_TOKEN_PATH", filepath.Join(dir, "auth.json"))
+	t.Setenv("PINGCODE_PROJECT_IDENTIFIER", "DEMO")
+
+	var stdout bytes.Buffer
+	result := pingcode.Execute(context.Background(), []string{"project", "schema", "--kind", "bug"}, pingcode.RuntimeDependencies{Stdout: &stdout})
+	if result.ExitCode != cli.ExitOK {
+		t.Fatalf("exit=%d out=%s", result.ExitCode, stdout.String())
+	}
+	if planPages.Load() < 2 {
+		t.Fatalf("expected multi-page state plans, pages=%d out=%s", planPages.Load(), stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "stateTransitions") {
+		t.Fatalf("expected stateTransitions in schema: %s", stdout.String())
+	}
+}
