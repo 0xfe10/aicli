@@ -193,12 +193,13 @@ pingcode-shadow-dry-run: _pingcode-require-bin
     printf '%s\n' "{${payload_base},\"title\":\"aicli-shadow-dryrun-update-${run_id}\"}" \
       | "{{ pingcode_bin }}" work-item update --input - | tee "$out/update-dryrun.json"
     python3 -c 'import json,sys; doc=json.load(open(sys.argv[1])); d=doc.get("data") or {}; assert doc.get("ok") is True and d.get("dryRun") is True, doc; print("dry-run update ok")' "$out/update-dryrun.json"
-    # Transition dry-run may return EXPECTED_STATE_MISMATCH against live state; still require one JSON doc.
-    set +e
-    printf '%s\n' "{${payload_base},\"statusName\":\"处理中\",\"expectedCurrentState\":\"新提交\"}" \
+
+    "{{ pingcode_bin }}" project schema --kind bug | tee "$out/schema-for-dryrun.json"
+    eval "$(python3 "{{ justfile_directory() }}/scripts/pingcode_shadow_pick_transition.py" "$out/before-dryrun-get.json" "$out/schema-for-dryrun.json")"
+    printf '%s\n' "{${payload_base},\"statusName\":\"${to_state}\",\"expectedCurrentState\":\"${from_state}\"}" \
       | "{{ pingcode_bin }}" work-item transition --input - | tee "$out/transition-dryrun.json"
-    set -e
-    python3 -c 'import json,sys; doc=json.load(open(sys.argv[1])); assert "ok" in doc and ("data" in doc or "error" in doc), doc; assert doc.get("ok") is not True or (doc.get("data") or {}).get("dryRun") is True, doc; print("dry-run transition JSON contract ok")' "$out/transition-dryrun.json"
+    python3 -c 'import json,sys; doc=json.load(open(sys.argv[1])); d=doc.get("data") or {}; assert doc.get("ok") is True and d.get("dryRun") is True, doc; print("dry-run transition ok", "from=%s" % sys.argv[2], "to=%s" % sys.argv[3])' "$out/transition-dryrun.json" "$from_state" "$to_state"
+
     printf '%s\n' "{${payload_base},\"content\":\"aicli-shadow-dryrun-comment-${run_id}\"}" \
       | "{{ pingcode_bin }}" work-item comment --input - | tee "$out/comment-dryrun.json"
     python3 -c 'import json,sys; doc=json.load(open(sys.argv[1])); d=doc.get("data") or {}; assert doc.get("ok") is True and d.get("dryRun") is True, doc; print("dry-run comment ok")' "$out/comment-dryrun.json"
@@ -234,15 +235,11 @@ pingcode-shadow-apply: _pingcode-require-bin
     "{{ pingcode_bin }}" work-item get --kind bug --id "$wi_id" | tee "$out/get-after-update.json"
 
     "{{ pingcode_bin }}" project schema --kind bug | tee "$out/schema-for-apply.json"
-    to_state="$(python3 -c 'import json,sys; doc=json.load(open(sys.argv[1])); data=doc.get("data") or {}; names=[s.get("name") for s in (data.get("states") or []) if s.get("name")]; cur=sys.argv[2]; print(next((n for n in names if n and n!=cur), ""))' "$out/schema-for-apply.json" "${from_state:-}")"
-    if [[ -n "${to_state:-}" && -n "${from_state:-}" ]]; then
-      printf '%s\n' "{\"kind\":\"bug\",\"workItemId\":\"${wi_id}\",\"statusName\":\"${to_state}\",\"expectedCurrentState\":\"${from_state}\"}" \
-        | "{{ pingcode_bin }}" work-item transition --input - --apply | tee "$out/transition-apply.json"
-      python3 -c 'import json,sys; doc=json.load(open(sys.argv[1])); assert doc.get("ok") is True or (doc.get("error") or {}).get("code") in ("EXPECTED_STATE_MISMATCH","PARTIAL_SUCCESS"), doc; print("transition apply recorded")' "$out/transition-apply.json"
-      "{{ pingcode_bin }}" work-item get --kind bug --id "$wi_id" | tee "$out/get-after-transition.json"
-    else
-      echo "skip transition: could not resolve from/to state" | tee "$out/transition-skipped.txt"
-    fi
+    eval "$(python3 "{{ justfile_directory() }}/scripts/pingcode_shadow_pick_transition.py" "$out/get-after-update.json" "$out/schema-for-apply.json")"
+    printf '%s\n' "{\"kind\":\"bug\",\"workItemId\":\"${wi_id}\",\"statusName\":\"${to_state}\",\"expectedCurrentState\":\"${from_state}\"}" \
+      | "{{ pingcode_bin }}" work-item transition --input - --apply | tee "$out/transition-apply.json"
+    python3 -c 'import json,sys; doc=json.load(open(sys.argv[1])); assert doc.get("ok") is True, doc; print("transition apply ok", "from=%s" % sys.argv[2], "to=%s" % sys.argv[3])' "$out/transition-apply.json" "$from_state" "$to_state"
+    "{{ pingcode_bin }}" work-item get --kind bug --id "$wi_id" | tee "$out/get-after-transition.json"
 
     printf '%s\n' "{\"kind\":\"bug\",\"workItemId\":\"${wi_id}\",\"content\":\"shadow apply comment runId=${run_id}\"}" \
       | "{{ pingcode_bin }}" work-item comment --input - --apply | tee "$out/comment-apply.json"

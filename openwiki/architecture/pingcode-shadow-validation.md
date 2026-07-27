@@ -164,5 +164,7 @@ Code-level gates landed before the next Release artifact:
 - Shadow dry-run covers create/update/transition/comment plus before/after GET
   zero-write compare; apply covers create/update/transition/comment with GET
   checkpoints; release-verify checks archive/checksum/version/commit when env set.
+- Transition shadow recipes pick a legal target from schema `stateTransitions`
+  for the work item's current state and require `ok=true` / `dryRun=true`.
 - Token permission test forces `chmod 0644` after write so umask 0077 cannot flake.
 - Comments and state plans/flows paginate; comments expose `truncated`.
