@@ -22,41 +22,67 @@ type Credentials struct {
 	Source       string
 }
 
+type environmentSnapshot struct {
+	BaseURL      string
+	SpecURL      string
+	AccessToken  string
+	ClientID     string
+	ClientSecret string
+}
+
+func readEnvironmentSnapshot() environmentSnapshot {
+	return environmentSnapshot{
+		BaseURL:      strings.TrimSpace(os.Getenv("PINGCODE_API_BASE_URL")),
+		SpecURL:      strings.TrimSpace(os.Getenv("PINGCODE_SPEC_URL")),
+		AccessToken:  strings.TrimSpace(os.Getenv("PINGCODE_ACCESS_TOKEN")),
+		ClientID:     strings.TrimSpace(os.Getenv("PINGCODE_CLIENT_ID")),
+		ClientSecret: strings.TrimSpace(os.Getenv("PINGCODE_CLIENT_SECRET")),
+	}
+}
+
 // ResolveCredentials applies the environment-over-config precedence rules.
 func ResolveCredentials() (Credentials, error) {
 	return resolveCredentials(ConfigPath())
 }
 
 func resolveCredentials(configPath string) (Credentials, error) {
-	token := strings.TrimSpace(os.Getenv("PINGCODE_ACCESS_TOKEN"))
-	clientID := strings.TrimSpace(os.Getenv("PINGCODE_CLIENT_ID"))
-	clientSecret := strings.TrimSpace(os.Getenv("PINGCODE_CLIENT_SECRET"))
-
-	if token != "" {
-		return Credentials{
-			Mode:        AuthModeToken,
-			AccessToken: token,
-			Source:      CredentialSourceEnvironment,
-		}, nil
-	}
-	if clientID != "" || clientSecret != "" {
-		if clientID == "" || clientSecret == "" {
-			return Credentials{}, fmt.Errorf("PingCode authentication requires both PINGCODE_CLIENT_ID and PINGCODE_CLIENT_SECRET when using environment client credentials")
+	env := readEnvironmentSnapshot()
+	if env.AccessToken != "" || env.ClientID != "" || env.ClientSecret != "" {
+		creds, configured, err := credentialsFromSnapshot(FileConfig{}, env)
+		if err != nil {
+			return Credentials{}, err
 		}
-		return Credentials{
-			Mode:         AuthModeClient,
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-			Source:       CredentialSourceEnvironment,
-		}, nil
+		if configured {
+			return creds, nil
+		}
 	}
-
-	auth, err := LoadAuthConfig(configPath)
+	file, err := LoadFileConfig(configPath)
 	if err != nil {
 		return Credentials{}, err
 	}
-	if auth == nil {
+	creds, configured, err := credentialsFromSnapshot(file, env)
+	if err != nil {
+		return Credentials{}, err
+	}
+	if !configured {
 		return Credentials{}, fmt.Errorf("PingCode authentication is not configured; run %q or set PINGCODE_ACCESS_TOKEN / PINGCODE_CLIENT_ID and PINGCODE_CLIENT_SECRET", "pingcode auth login")
+	}
+	return creds, nil
+}
+
+func credentialsFromSnapshot(file FileConfig, env environmentSnapshot) (Credentials, bool, error) {
+	if env.AccessToken != "" {
+		return Credentials{Mode: AuthModeToken, AccessToken: env.AccessToken, Source: CredentialSourceEnvironment}, true, nil
+	}
+	if env.ClientID != "" || env.ClientSecret != "" {
+		if env.ClientID == "" || env.ClientSecret == "" {
+			return Credentials{}, false, fmt.Errorf("PingCode authentication requires both PINGCODE_CLIENT_ID and PINGCODE_CLIENT_SECRET when using environment client credentials")
+		}
+		return Credentials{Mode: AuthModeClient, ClientID: env.ClientID, ClientSecret: env.ClientSecret, Source: CredentialSourceEnvironment}, true, nil
+	}
+	auth := file.Auth
+	if auth == nil {
+		return Credentials{}, false, nil
 	}
 	switch auth.Mode {
 	case AuthModeToken:
@@ -64,31 +90,39 @@ func resolveCredentials(configPath string) (Credentials, error) {
 			Mode:        AuthModeToken,
 			AccessToken: auth.AccessToken,
 			Source:      CredentialSourceConfig,
-		}, nil
+		}, true, nil
 	case AuthModeClient:
 		return Credentials{
 			Mode:         AuthModeClient,
 			ClientID:     auth.ClientID,
 			ClientSecret: auth.ClientSecret,
 			Source:       CredentialSourceConfig,
-		}, nil
+		}, true, nil
 	default:
-		return Credentials{}, fmt.Errorf("unsupported auth mode %q in PingCode config", auth.Mode)
+		return Credentials{}, false, fmt.Errorf("unsupported auth mode %q in PingCode config", auth.Mode)
 	}
 }
 
 // ResolveBaseURL resolves Base URL with env > config > default precedence.
 func ResolveBaseURL(configPath string) (value, source string, err error) {
-	if env := strings.TrimSpace(os.Getenv("PINGCODE_API_BASE_URL")); env != "" {
-		normalized, err := authflow.NormalizeBaseURL(env)
-		if err != nil {
-			return "", "", fmt.Errorf("PINGCODE_API_BASE_URL: %w", err)
-		}
-		return normalized, authflow.SourceEnvironment, nil
+	env := readEnvironmentSnapshot()
+	if env.BaseURL != "" {
+		return baseURLFromSnapshot(FileConfig{}, env)
 	}
 	file, err := LoadFileConfig(configPath)
 	if err != nil {
 		return "", "", err
+	}
+	return baseURLFromSnapshot(file, env)
+}
+
+func baseURLFromSnapshot(file FileConfig, env environmentSnapshot) (value, source string, err error) {
+	if env.BaseURL != "" {
+		normalized, err := authflow.NormalizeBaseURL(env.BaseURL)
+		if err != nil {
+			return "", "", fmt.Errorf("PINGCODE_API_BASE_URL: %w", err)
+		}
+		return normalized, authflow.SourceEnvironment, nil
 	}
 	if file.BaseURL != "" {
 		normalized, err := authflow.NormalizeBaseURL(file.BaseURL)

@@ -54,6 +54,10 @@ func ConfigPath() string {
 
 // LoadFileConfig reads config.toml. Missing files yield an empty config.
 func LoadFileConfig(path string) (FileConfig, error) {
+	return loadFileConfig(path, false)
+}
+
+func loadFileConfig(path string, discardAuth bool) (FileConfig, error) {
 	if path == "" {
 		return FileConfig{}, fmt.Errorf("PingCode config path is unavailable")
 	}
@@ -65,6 +69,13 @@ func LoadFileConfig(path string) (FileConfig, error) {
 		return FileConfig{}, fmt.Errorf("stat PingCode config: %w", err)
 	}
 	if err := rejectInsecureFile(path, info); err != nil {
+		return FileConfig{}, err
+	}
+	dirInfo, err := os.Lstat(filepath.Dir(path))
+	if err != nil {
+		return FileConfig{}, fmt.Errorf("stat PingCode config dir: %w", err)
+	}
+	if err := rejectInsecureDir(filepath.Dir(path), dirInfo); err != nil {
 		return FileConfig{}, err
 	}
 	data, err := os.ReadFile(path)
@@ -79,6 +90,10 @@ func LoadFileConfig(path string) (FileConfig, error) {
 		return FileConfig{}, fmt.Errorf("parse PingCode config: %w", err)
 	}
 	file.BaseURL = strings.TrimSpace(file.BaseURL)
+	if discardAuth {
+		file.Auth = nil
+		return file, nil
+	}
 	if file.Auth != nil {
 		if err := validateAuthConfig(file.Auth); err != nil {
 			return FileConfig{}, err
@@ -112,7 +127,7 @@ func SaveLogin(path, baseURL string, auth *AuthConfig) error {
 	if err := ensureSecureDir(filepath.Dir(path)); err != nil {
 		return err
 	}
-	file, err := LoadFileConfig(path)
+	file, err := loadFileConfig(path, true)
 	if err != nil {
 		return err
 	}
@@ -136,7 +151,7 @@ func ClearAuthConfig(path string) error {
 	if err := rejectInsecureFile(path, info); err != nil {
 		return err
 	}
-	file, err := LoadFileConfig(path)
+	file, err := loadFileConfig(path, true)
 	if err != nil {
 		return err
 	}

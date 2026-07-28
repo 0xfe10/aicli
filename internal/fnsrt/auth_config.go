@@ -28,9 +28,11 @@ type AuthConfig struct {
 
 // FileConfig is the persisted FNS configuration file.
 type FileConfig struct {
-	BaseURL string      `toml:"base_url,omitempty"`
-	Client  string      `toml:"client,omitempty"`
-	Auth    *AuthConfig `toml:"auth,omitempty"`
+	BaseURL string `toml:"base_url,omitempty"`
+	Client  string `toml:"client,omitempty"`
+	// LegacyAccessToken is the RC top-level access_token field.
+	LegacyAccessToken string      `toml:"access_token,omitempty"`
+	Auth              *AuthConfig `toml:"auth,omitempty"`
 }
 
 // ConfigDir returns $XDG_CONFIG_HOME/aicli/fns or ~/.config/aicli/fns.
@@ -51,7 +53,12 @@ func ConfigPath() string {
 }
 
 // LoadFileConfig reads config.toml. Missing files yield an empty config.
+// Legacy top-level access_token is accepted and normalized into [auth].
 func LoadFileConfig(path string) (FileConfig, error) {
+	return loadFileConfig(path, false)
+}
+
+func loadFileConfig(path string, discardAuth bool) (FileConfig, error) {
 	if path == "" {
 		return FileConfig{}, fmt.Errorf("FNS config path is unavailable")
 	}
@@ -63,6 +70,13 @@ func LoadFileConfig(path string) (FileConfig, error) {
 		return FileConfig{}, fmt.Errorf("stat FNS config: %w", err)
 	}
 	if err := rejectInsecureFile(path, info); err != nil {
+		return FileConfig{}, err
+	}
+	dirInfo, err := os.Lstat(filepath.Dir(path))
+	if err != nil {
+		return FileConfig{}, fmt.Errorf("stat FNS config dir: %w", err)
+	}
+	if err := rejectInsecureDir(filepath.Dir(path), dirInfo); err != nil {
 		return FileConfig{}, err
 	}
 	data, err := os.ReadFile(path)
@@ -78,12 +92,38 @@ func LoadFileConfig(path string) (FileConfig, error) {
 	}
 	file.BaseURL = strings.TrimSpace(file.BaseURL)
 	file.Client = strings.TrimSpace(file.Client)
+	file.LegacyAccessToken = strings.TrimSpace(file.LegacyAccessToken)
+	if discardAuth {
+		file.LegacyAccessToken = ""
+		file.Auth = nil
+		return file, nil
+	}
+	if err := normalizeLegacyAuth(&file); err != nil {
+		return FileConfig{}, err
+	}
 	if file.Auth != nil {
 		if err := validateAuthConfig(file.Auth); err != nil {
 			return FileConfig{}, err
 		}
 	}
 	return file, nil
+}
+
+func normalizeLegacyAuth(file *FileConfig) error {
+	legacy := strings.TrimSpace(file.LegacyAccessToken)
+	if file.Auth != nil && strings.TrimSpace(file.Auth.AccessToken) != "" {
+		if legacy != "" && legacy != strings.TrimSpace(file.Auth.AccessToken) {
+			return fmt.Errorf("FNS config has conflicting access_token values at top level and under [auth]; keep only [auth].access_token")
+		}
+		file.LegacyAccessToken = ""
+		return nil
+	}
+	if legacy == "" {
+		return nil
+	}
+	file.Auth = &AuthConfig{Mode: AuthModeToken, AccessToken: legacy}
+	file.LegacyAccessToken = ""
+	return nil
 }
 
 // SaveLogin atomically writes base_url and [auth] into config.toml.
@@ -95,13 +135,16 @@ func SaveLogin(path, baseURL string, auth *AuthConfig) error {
 	if err != nil {
 		return err
 	}
+	if IsPlaceholderBaseURL(normalized) {
+		return fmt.Errorf("Base URL must not use the placeholder host %q", PlaceholderHost)
+	}
 	if err := validateAuthConfig(auth); err != nil {
 		return err
 	}
 	if err := ensureSecureDir(filepath.Dir(path)); err != nil {
 		return err
 	}
-	file, err := LoadFileConfig(path)
+	file, err := loadFileConfig(path, true)
 	if err != nil {
 		return err
 	}
@@ -110,6 +153,7 @@ func SaveLogin(path, baseURL string, auth *AuthConfig) error {
 		file.Client = DefaultClient
 	}
 	file.Auth = auth
+	file.LegacyAccessToken = ""
 	return writeConfigFileAtomic(path, file)
 }
 
@@ -128,11 +172,12 @@ func ClearAuthConfig(path string) error {
 	if err := rejectInsecureFile(path, info); err != nil {
 		return err
 	}
-	file, err := LoadFileConfig(path)
+	file, err := loadFileConfig(path, true)
 	if err != nil {
 		return err
 	}
 	file.Auth = nil
+	file.LegacyAccessToken = ""
 	return writeConfigFileAtomic(path, file)
 }
 
@@ -159,6 +204,8 @@ func writeConfigFileAtomic(path string, file FileConfig) error {
 	if err := ensureSecureDir(dir); err != nil {
 		return err
 	}
+	// Never persist the legacy top-level access_token field.
+	file.LegacyAccessToken = ""
 	data, err := toml.Marshal(file)
 	if err != nil {
 		return fmt.Errorf("encode FNS config: %w", err)

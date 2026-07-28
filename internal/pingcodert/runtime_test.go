@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	restish "github.com/rest-sh/restish/v2"
 )
 
 func TestEmbeddedRestishGeneratedCommandsExecuteRequests(t *testing.T) {
@@ -70,7 +73,7 @@ func TestEmbeddedRestishGeneratedCommandsExecuteRequests(t *testing.T) {
 	})
 
 	stateDir := t.TempDir()
-	t.Setenv("RSH_CONFIG_DIR", stateDir+"/config")
+	t.Setenv("XDG_CONFIG_HOME", stateDir)
 	t.Setenv("RSH_CACHE_DIR", stateDir+"/cache")
 	t.Setenv("PINGCODE_API_BASE_URL", server.URL)
 	t.Setenv("PINGCODE_CLIENT_ID", "client")
@@ -115,15 +118,15 @@ func TestEmbeddedRestishBlocksWritesByDefault(t *testing.T) {
 	})
 
 	stateDir := t.TempDir()
-	t.Setenv("RSH_CONFIG_DIR", stateDir+"/config")
+	t.Setenv("XDG_CONFIG_HOME", stateDir)
 	t.Setenv("RSH_CACHE_DIR", stateDir+"/cache")
 	t.Setenv("PINGCODE_API_BASE_URL", server.URL)
 	t.Setenv("PINGCODE_ACCESS_TOKEN", "token")
-	cli := NewCLI(Config{APIBaseURL: server.URL, SpecURL: server.URL + "/api_data.json"}, "test", "")
+	cli := newCLIForTest(Config{APIBaseURL: server.URL, SpecURL: server.URL + "/api_data.json"}, "test", "")
 	cli.Stdin = strings.NewReader(`{"title":"blocked"}`)
 	var stdout, stderr bytes.Buffer
 	cli.Stdout, cli.Stderr = &stdout, &stderr
-	err := cli.Run([]string{"pingcode", "pjm", "post-work-items", "-o", "json"})
+	err := RunCLI(cli, []string{"pingcode", "pjm", "post-work-items", "-o", "json"})
 	if err == nil || !strings.Contains(err.Error(), "blocked by PINGCODE_WRITE_MODE=readonly") {
 		t.Fatalf("error = %v, stdout=%s stderr=%s", err, stdout.String(), stderr.String())
 	}
@@ -143,16 +146,16 @@ func TestEmbeddedRestishDoesNotRetryWriteAfterUnauthorized(t *testing.T) {
 	})
 
 	stateDir := t.TempDir()
-	t.Setenv("RSH_CONFIG_DIR", stateDir+"/config")
+	t.Setenv("XDG_CONFIG_HOME", stateDir)
 	t.Setenv("RSH_CACHE_DIR", stateDir+"/cache")
 	t.Setenv("PINGCODE_API_BASE_URL", server.URL)
 	t.Setenv("PINGCODE_ACCESS_TOKEN", "token")
 	t.Setenv("PINGCODE_WRITE_MODE", "write")
-	cli := NewCLI(Config{APIBaseURL: server.URL, SpecURL: server.URL + "/api_data.json"}, "test", "")
+	cli := newCLIForTest(Config{APIBaseURL: server.URL, SpecURL: server.URL + "/api_data.json"}, "test", "")
 	cli.Stdin = strings.NewReader(`{"title":"uncertain"}`)
 	var stdout, stderr bytes.Buffer
 	cli.Stdout, cli.Stderr = &stdout, &stderr
-	err := cli.Run([]string{"pingcode", "pjm", "post-work-items", "-o", "json"})
+	err := RunCLI(cli, []string{"pingcode", "pjm", "post-work-items", "-o", "json"})
 	if err == nil || !strings.Contains(err.Error(), "automatic retry is disabled for writes") {
 		t.Fatalf("error = %v, stdout=%s stderr=%s", err, stdout.String(), stderr.String())
 	}
@@ -297,14 +300,53 @@ func TestEmbeddedRestishUsesConfigFileAccessToken(t *testing.T) {
 
 func runTestCLI(t *testing.T, cfg Config, stdin string, args []string) string {
 	t.Helper()
-	cli := NewCLI(cfg, "test", "")
+	if os.Getenv("XDG_CONFIG_HOME") == "" {
+		t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	}
+	cli := newCLIForTest(cfg, "test", "")
 	cli.Stdin = strings.NewReader(stdin)
 	var stdout, stderr bytes.Buffer
 	cli.Stdout, cli.Stderr = &stdout, &stderr
-	if err := cli.Run(args); err != nil {
+	if err := RunCLI(cli, args); err != nil {
 		t.Fatalf("Run(%v): %v\nstderr: %s", args, err, stderr.String())
 	}
 	return stdout.String()
+}
+
+func TestEnvironmentOnlySessionWithoutHome(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("PINGCODE_API_BASE_URL", "https://pingcode.example.test")
+	t.Setenv("PINGCODE_ACCESS_TOKEN", "env-token")
+	t.Setenv("PINGCODE_CLIENT_ID", "")
+	t.Setenv("PINGCODE_CLIENT_SECRET", "")
+	session, err := LoadSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := ConfigFromSession(session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !session.HasCredentials || session.Credentials.AccessToken != "env-token" || cfg.APIBaseURL != "https://pingcode.example.test" {
+		t.Fatalf("session=%#v cfg=%#v", session, cfg)
+	}
+	cli := NewCLIWithSession(cfg, session, "test", "")
+	var stdout, stderr bytes.Buffer
+	cli.Stdout, cli.Stderr = &stdout, &stderr
+	if err := RunCLI(cli, []string{"pingcode", "--version"}); err != nil {
+		t.Fatalf("version failed without home: %v stderr=%s", err, stderr.String())
+	}
+}
+
+func newCLIForTest(cfg Config, version, commit string) *restish.CLI {
+	session := Session{BaseURL: cfg.APIBaseURL}
+	if creds, err := ResolveCredentials(); err == nil {
+		session.Credentials = creds
+		session.HasCredentials = true
+		session.CredentialSource = creds.Source
+	}
+	return NewCLIWithSession(cfg, session, version, commit)
 }
 
 func assertBearer(t *testing.T, r *http.Request) {

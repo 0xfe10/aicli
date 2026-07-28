@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/0xfe10/aicli/internal/authflow"
+	"github.com/0xfe10/aicli/internal/restishengine"
 	restishauth "github.com/rest-sh/restish/v2/auth"
 )
 
@@ -199,6 +200,23 @@ func TestResolveBaseURLPrecedence(t *testing.T) {
 	}
 }
 
+func TestResolversUseCompleteEnvironmentWithoutConfigPath(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("PINGCODE_ACCESS_TOKEN", "env-token")
+	t.Setenv("PINGCODE_CLIENT_ID", "")
+	t.Setenv("PINGCODE_CLIENT_SECRET", "")
+	t.Setenv("PINGCODE_API_BASE_URL", "https://env.pingcode.test")
+	creds, err := ResolveCredentials()
+	if err != nil || creds.AccessToken != "env-token" {
+		t.Fatalf("credentials=%#v err=%v", creds, err)
+	}
+	baseURL, source, err := ResolveBaseURL(ConfigPath())
+	if err != nil || baseURL != "https://env.pingcode.test" || source != CredentialSourceEnvironment {
+		t.Fatalf("baseURL=%q source=%q err=%v", baseURL, source, err)
+	}
+}
+
 func TestAuthStatusDoesNotLeakSecrets(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", dir)
@@ -235,13 +253,18 @@ func TestAuthLoginLogoutClearsTokenCache(t *testing.T) {
 	t.Setenv("PINGCODE_CLIENT_SECRET", "")
 	configureStatePaths()
 
-	cachePath := restishauth.DefaultTokenCachePath()
+	cachePath := restishengine.TokenCachePath(ConfigDir())
 	if err := os.MkdirAll(filepath.Dir(cachePath), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	cache := restishauth.NewTokenCache(cachePath)
-	key := clientCredentialsCacheKey("test", DefaultAPIBaseURL, "id")
+	key := clientCredentialsCacheKey("pingcode:default:credential:enterpriseToken", DefaultAPIBaseURL, "id", "secret")
 	if err := cache.Set(key, restishauth.CachedToken{AccessToken: "cached"}); err != nil {
+		t.Fatal(err)
+	}
+	ordinaryPath := filepath.Join(dir, "ordinary-restish", "tokens.cbor")
+	ordinary := restishauth.NewTokenCache(ordinaryPath)
+	if err := ordinary.Set("other:default", restishauth.CachedToken{AccessToken: "keep"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -268,6 +291,9 @@ func TestAuthLoginLogoutClearsTokenCache(t *testing.T) {
 	if got != nil {
 		t.Fatalf("expected cache clear after login, got %#v", got)
 	}
+	if got, err := ordinary.Get("other:default"); err != nil || got == nil || got.AccessToken != "keep" {
+		t.Fatalf("ordinary Restish cache changed: got=%#v err=%v", got, err)
+	}
 
 	if err := cache.Set(key, restishauth.CachedToken{AccessToken: "cached-again"}); err != nil {
 		t.Fatal(err)
@@ -290,6 +316,68 @@ func TestAuthLoginRejectsSecretFlags(t *testing.T) {
 	err := RunAuth([]string{"login", "--mode", "token", "--access-token", "x"}, AuthIO{})
 	if err == nil || !strings.Contains(err.Error(), "not supported") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestAuthStatusAndLogoutRejectArguments(t *testing.T) {
+	for _, args := range [][]string{{"status", "extra"}, {"logout", "--force"}} {
+		if err := RunAuth(args, AuthIO{}); err == nil || !strings.Contains(err.Error(), "does not accept arguments") {
+			t.Fatalf("RunAuth(%v) error = %v", args, err)
+		}
+	}
+}
+
+func TestLoadFileConfigRejectsSymlinkDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink setup requires additional Windows privileges")
+	}
+	xdg := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	target := t.TempDir()
+	if err := os.WriteFile(filepath.Join(target, configFileName), []byte("base_url=\"https://open.pingcode.com\"\n[auth]\nmode=\"token\"\naccess_token=\"x\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(xdg, "aicli"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, ConfigDir()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadFileConfig(ConfigPath()); err == nil || !strings.Contains(err.Error(), "directory must not be a symlink") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLoginAndLogoutRepairInvalidAuthSection(t *testing.T) {
+	xdg := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	path := ConfigPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	invalid := "base_url=\"https://old.example.test\"\n[auth]\nmode=\"unsupported\"\naccess_token=\"old\"\n"
+	if err := os.WriteFile(path, []byte(invalid), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadFileConfig(path); err == nil {
+		t.Fatal("normal reads must reject invalid auth")
+	}
+	if err := SaveLogin(path, "https://fixed.example.test", &AuthConfig{Mode: AuthModeToken, AccessToken: "replacement"}); err != nil {
+		t.Fatal(err)
+	}
+	file, err := LoadFileConfig(path)
+	if err != nil || file.Auth == nil || file.Auth.AccessToken != "replacement" {
+		t.Fatalf("repaired login = %#v err=%v", file, err)
+	}
+	if err := os.WriteFile(path, []byte(invalid), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ClearAuthConfig(path); err != nil {
+		t.Fatal(err)
+	}
+	file, err = LoadFileConfig(path)
+	if err != nil || file.Auth != nil || file.BaseURL != "https://old.example.test" {
+		t.Fatalf("repaired logout = %#v err=%v", file, err)
 	}
 }
 

@@ -56,7 +56,14 @@ func TestClientCredentialsAuthCachesAndForceRefreshes(t *testing.T) {
 	t.Setenv("PINGCODE_CLIENT_SECRET", "secret-value")
 	t.Setenv("PINGCODE_WRITE_MODE", "readonly")
 	store := &memoryTokenStore{tokens: map[string]restishauth.CachedToken{}}
-	handler := &ClientCredentialsAuth{}
+	handler := &ClientCredentialsAuth{Session: Session{
+		BaseURL:        server.URL,
+		HasCredentials: true,
+		Credentials: Credentials{
+			Mode: AuthModeClient, ClientID: "client-id", ClientSecret: "secret-value",
+			Source: CredentialSourceEnvironment,
+		},
+	}}
 	authContext := restishauth.AuthContext{BaseURL: server.URL, CacheKey: "test", TokenStore: store, HTTPClient: server.Client()}
 
 	for _, force := range []bool{false, false, true} {
@@ -75,7 +82,11 @@ func TestClientCredentialsAuthCachesAndForceRefreshes(t *testing.T) {
 }
 
 func TestClientCredentialsAuthWritePolicy(t *testing.T) {
-	handler := &ClientCredentialsAuth{}
+	handler := &ClientCredentialsAuth{Session: Session{
+		BaseURL:        "https://open.pingcode.com",
+		HasCredentials: true,
+		Credentials:    Credentials{Mode: AuthModeToken, AccessToken: "token", Source: CredentialSourceEnvironment},
+	}}
 	for _, test := range []struct {
 		mode, method string
 		wantError    bool
@@ -88,10 +99,9 @@ func TestClientCredentialsAuthWritePolicy(t *testing.T) {
 		{"invalid", http.MethodGet, true},
 	} {
 		t.Run(test.mode+test.method, func(t *testing.T) {
-			t.Setenv("PINGCODE_ACCESS_TOKEN", "token")
 			t.Setenv("PINGCODE_WRITE_MODE", test.mode)
 			req, _ := http.NewRequest(test.method, "https://open.pingcode.com/v1/test", nil)
-			err := handler.Authenticate(context.Background(), req, restishauth.AuthContext{})
+			err := handler.Authenticate(context.Background(), req, restishauth.AuthContext{BaseURL: "https://open.pingcode.com"})
 			if (err != nil) != test.wantError {
 				t.Fatalf("error = %v, wantError=%v", err, test.wantError)
 			}
@@ -100,35 +110,49 @@ func TestClientCredentialsAuthWritePolicy(t *testing.T) {
 }
 
 func TestCachedTokenSafetyMargin(t *testing.T) {
-	cacheKey := clientCredentialsCacheKey("test", DefaultAPIBaseURL, "unused")
+	cacheKey := clientCredentialsCacheKey("test", DefaultAPIBaseURL, "unused", "unused")
 	store := &memoryTokenStore{tokens: map[string]restishauth.CachedToken{
 		cacheKey: {AccessToken: "cached", TokenType: "Bearer", Expiry: time.Now().Add(time.Hour)},
 	}}
 	t.Setenv("PINGCODE_CLIENT_ID", "unused")
 	t.Setenv("PINGCODE_CLIENT_SECRET", "unused")
 	req, _ := http.NewRequest(http.MethodGet, "https://open.pingcode.com/v1/test", nil)
-	err := (&ClientCredentialsAuth{}).Authenticate(context.Background(), req, restishauth.AuthContext{CacheKey: "test", TokenStore: store})
+	err := (&ClientCredentialsAuth{Session: Session{
+		BaseURL:        DefaultAPIBaseURL,
+		HasCredentials: true,
+		Credentials: Credentials{
+			Mode: AuthModeClient, ClientID: "unused", ClientSecret: "unused",
+		},
+	}}).Authenticate(context.Background(), req, restishauth.AuthContext{CacheKey: "test", TokenStore: store, BaseURL: DefaultAPIBaseURL})
 	if err != nil || req.Header.Get("Authorization") != "Bearer cached" {
 		t.Fatalf("authorization=%q error=%v", req.Header.Get("Authorization"), err)
 	}
 }
 
 func TestClientCredentialsCacheKeySeparatesAPIHosts(t *testing.T) {
-	one := clientCredentialsCacheKey("pingcode:default", "https://one.example.com/", "client-one")
-	two := clientCredentialsCacheKey("pingcode:default", "https://two.example.com", "client-one")
+	one := clientCredentialsCacheKey("pingcode:default", "https://one.example.com/", "client-one", "secret")
+	two := clientCredentialsCacheKey("pingcode:default", "https://two.example.com", "client-one", "secret")
 	if one == two {
 		t.Fatalf("cache keys should differ across API hosts: %q", one)
 	}
-	if got := clientCredentialsCacheKey("pingcode:default", "https://one.example.com", "client-one"); got != one {
+	if got := clientCredentialsCacheKey("pingcode:default", "https://one.example.com", "client-one", "secret"); got != one {
 		t.Fatalf("cache key is not stable: %q != %q", got, one)
 	}
 }
 
 func TestClientCredentialsCacheKeySeparatesClientIDs(t *testing.T) {
-	one := clientCredentialsCacheKey("pingcode:default", DefaultAPIBaseURL, "client-one")
-	two := clientCredentialsCacheKey("pingcode:default", DefaultAPIBaseURL, "client-two")
+	one := clientCredentialsCacheKey("pingcode:default", DefaultAPIBaseURL, "client-one", "secret")
+	two := clientCredentialsCacheKey("pingcode:default", DefaultAPIBaseURL, "client-two", "secret")
 	if one == two {
 		t.Fatalf("cache keys should differ across client IDs: %q", one)
+	}
+}
+
+func TestClientCredentialsCacheKeyChangesWithSecret(t *testing.T) {
+	one := clientCredentialsCacheKey("pingcode:default", DefaultAPIBaseURL, "client", "secret-one")
+	two := clientCredentialsCacheKey("pingcode:default", DefaultAPIBaseURL, "client", "secret-two")
+	if one == two || strings.Contains(one, "secret-one") || strings.Contains(two, "secret-two") {
+		t.Fatalf("cache keys must use a non-plaintext secret fingerprint: %q %q", one, two)
 	}
 }
 

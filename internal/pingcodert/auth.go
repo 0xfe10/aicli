@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/0xfe10/aicli/internal/authflow"
 	restishauth "github.com/rest-sh/restish/v2/auth"
 )
 
@@ -19,13 +20,17 @@ const maxTokenResponseBytes = 1 << 20
 
 // ClientCredentialsAuth implements PingCode's non-standard GET-based client
 // credentials exchange and participates in Restish's token cache and 401 retry.
-type ClientCredentialsAuth struct{}
+// Session must be bound at CLI construction so Base URL and credentials stay
+// consistent for the process lifetime.
+type ClientCredentialsAuth struct {
+	Session Session
+}
 
 func (*ClientCredentialsAuth) Parameters() []restishauth.Param { return nil }
 
 func (*ClientCredentialsAuth) SupportsForce() {}
 
-func (*ClientCredentialsAuth) Authenticate(ctx context.Context, req *http.Request, ac restishauth.AuthContext) error {
+func (a *ClientCredentialsAuth) Authenticate(ctx context.Context, req *http.Request, ac restishauth.AuthContext) error {
 	if err := enforceWriteMode(req.Method, os.Getenv("PINGCODE_WRITE_MODE")); err != nil {
 		return err
 	}
@@ -33,20 +38,27 @@ func (*ClientCredentialsAuth) Authenticate(ctx context.Context, req *http.Reques
 		return fmt.Errorf("PingCode %s request returned unauthorized; automatic retry is disabled for writes because the outcome is uncertain", strings.ToUpper(req.Method))
 	}
 
-	creds, err := ResolveCredentials()
-	if err != nil {
-		return err
+	baseURL := strings.TrimSpace(a.Session.BaseURL)
+	if baseURL == "" {
+		baseURL = strings.TrimSpace(ac.BaseURL)
+	}
+	if baseURL == "" {
+		baseURL = DefaultAPIBaseURL
+	}
+	if err := authflow.RequestUnderBaseURL(req.URL, baseURL); err != nil {
+		return fmt.Errorf("refusing to attach PingCode credentials: %w", err)
+	}
+
+	creds := a.Session.Credentials
+	if !a.Session.HasCredentials {
+		return fmt.Errorf("PingCode authentication is not configured; run %q or set PINGCODE_ACCESS_TOKEN / PINGCODE_CLIENT_ID and PINGCODE_CLIENT_SECRET", "pingcode auth login")
 	}
 	if creds.Mode == AuthModeToken {
 		req.Header.Set("Authorization", "Bearer "+creds.AccessToken)
 		return nil
 	}
 
-	baseURL := strings.TrimRight(envOr("PINGCODE_API_BASE_URL", ac.BaseURL), "/")
-	if baseURL == "" {
-		baseURL = DefaultAPIBaseURL
-	}
-	cacheKey := clientCredentialsCacheKey(ac.CacheKey, baseURL, creds.ClientID)
+	cacheKey := clientCredentialsCacheKey(ac.CacheKey, baseURL, creds.ClientID, creds.ClientSecret)
 	if !ac.Force && ac.TokenStore != nil {
 		cached, err := ac.TokenStore.Get(cacheKey)
 		if err != nil {
@@ -71,13 +83,14 @@ func (*ClientCredentialsAuth) Authenticate(ctx context.Context, req *http.Reques
 	return nil
 }
 
-func clientCredentialsCacheKey(baseKey, baseURL, clientID string) string {
+func clientCredentialsCacheKey(baseKey, baseURL, clientID, clientSecret string) string {
 	if baseKey == "" {
 		baseKey = "pingcode/default/client-credentials"
 	}
 	baseURLSum := sha256.Sum256([]byte(strings.TrimRight(baseURL, "/")))
 	clientIDSum := sha256.Sum256([]byte(strings.TrimSpace(clientID)))
-	return fmt.Sprintf("%s:cred:client:base_url:%x:client_id:%x", baseKey, baseURLSum[:8], clientIDSum[:8])
+	clientSecretSum := sha256.Sum256([]byte(clientSecret))
+	return fmt.Sprintf("%s:cred:client:base_url:%x:client_id:%x:client_secret:%x", baseKey, baseURLSum[:8], clientIDSum[:8], clientSecretSum[:8])
 }
 
 func fetchClientCredentialsToken(ctx context.Context, client *http.Client, baseURL, clientID, clientSecret string) (restishauth.CachedToken, error) {

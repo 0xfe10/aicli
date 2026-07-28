@@ -120,14 +120,14 @@ func TestUnsupportedSpecDoesNotFallBackToBuiltinLoader(t *testing.T) {
 	})
 
 	stateDir := t.TempDir()
-	t.Setenv("RSH_CONFIG_DIR", stateDir+"/config")
+	t.Setenv("XDG_CONFIG_HOME", stateDir)
 	t.Setenv("RSH_CACHE_DIR", stateDir+"/cache")
 	t.Setenv("FNS_ACCESS_TOKEN", "token")
 
-	cli := NewCLI(Config{BaseURL: server.URL, SpecURL: server.URL + "/bad.json", Client: "aicli", Version: "test"}, "test", "")
+	cli := newCLIForTest(Config{BaseURL: server.URL, SpecURL: server.URL + "/bad.json", Client: "aicli", Version: "test"}, "test", "")
 	var stdout, stderr bytes.Buffer
 	cli.Stdout, cli.Stderr = &stdout, &stderr
-	err := cli.Run([]string{"fns", "--help"})
+	err := RunCLI(cli, []string{"fns", "--help"})
 	if err == nil {
 		t.Fatalf("expected unsupported spec failure, stdout=%s", stdout.String())
 	}
@@ -154,7 +154,7 @@ func captureCommandTree(t *testing.T, spec []byte) []string {
 	})
 
 	stateDir := t.TempDir()
-	t.Setenv("RSH_CONFIG_DIR", stateDir+"/config")
+	t.Setenv("XDG_CONFIG_HOME", stateDir)
 	t.Setenv("RSH_CACHE_DIR", stateDir+"/cache")
 	t.Setenv("FNS_ACCESS_TOKEN", "token")
 
@@ -216,10 +216,10 @@ func assertApprovedCommandTree(t *testing.T, tree []string) {
 
 func runHelp(t *testing.T, cfg Config, args []string) string {
 	t.Helper()
-	cli := NewCLI(cfg, "test", "")
+	cli := newCLIForTest(cfg, "test", "")
 	var stdout, stderr bytes.Buffer
 	cli.Stdout, cli.Stderr = &stdout, &stderr
-	err := cli.Run(args)
+	err := RunCLI(cli, args)
 	out := stdout.String()
 	if err != nil && out == "" {
 		t.Fatalf("Run(%v): %v\nstderr=%s", args, err, stderr.String())

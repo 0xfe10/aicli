@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/0xfe10/aicli/internal/authflow"
+	"github.com/0xfe10/aicli/internal/restishengine"
 	restishauth "github.com/rest-sh/restish/v2/auth"
 )
 
@@ -19,42 +20,70 @@ func defaultAuthIO() AuthIO {
 // MaybeRunAuth handles `pingcode auth ...` before Restish sees argv.
 // handled is true when args select the auth control plane.
 func MaybeRunAuth(args []string) (handled bool, err error) {
-	if len(args) < 2 || args[1] != "auth" {
-		return false, nil
+	authArgs, handled, err := authflow.LocalCommandArgs(args, "auth")
+	if err != nil || !handled {
+		return handled, err
 	}
 	configureStatePaths()
-	return true, RunAuth(args[2:], defaultAuthIO())
+	return true, RunAuth(authArgs, defaultAuthIO())
 }
 
 // RunAuth executes login/status/logout subcommands.
 func RunAuth(args []string, authIO AuthIO) error {
 	authIO = authIO.Normalize()
-	if len(args) == 0 {
-		return fmt.Errorf("usage: pingcode auth login|status|logout")
+	if len(args) == 0 || authflow.IsHelpArg(args[0]) {
+		fmt.Fprint(authIO.Stdout, authHelpText())
+		return nil
 	}
 	switch args[0] {
 	case "login":
 		return runAuthLogin(args[1:], authIO)
 	case "status":
-		return runAuthStatus(authIO)
+		return runAuthStatus(args[1:], authIO)
 	case "logout":
-		return runAuthLogout(authIO)
+		return runAuthLogout(args[1:], authIO)
 	default:
-		return fmt.Errorf("unknown auth command %q", args[0])
+		return fmt.Errorf("unknown auth command %q\n\n%s", args[0], authHelpText())
 	}
+}
+
+func authHelpText() string {
+	return `Usage:
+  pingcode auth login --mode client|token
+  pingcode auth status
+  pingcode auth logout
+
+Manage Base URL and credentials stored in config.toml.
+Secrets are entered interactively and are never accepted on argv.
+`
+}
+
+func loginHelpText() string {
+	return `Usage:
+  pingcode auth login --mode client
+  pingcode auth login --mode token
+
+Prompts:
+  Base URL          service origin (HTTPS; HTTP only for localhost)
+  Client ID/Secret  for --mode client
+  Access Token      for --mode token
+`
 }
 
 func runAuthLogin(args []string, authIO AuthIO) error {
 	mode := ""
 	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--mode":
+		switch {
+		case authflow.IsHelpArg(args[i]):
+			fmt.Fprint(authIO.Stdout, loginHelpText())
+			return nil
+		case args[i] == "--mode":
 			if i+1 >= len(args) {
 				return fmt.Errorf("--mode requires a value")
 			}
 			mode = args[i+1]
 			i++
-		case "--client-secret", "--access-token", "--client-id", "--base-url":
+		case args[i] == "--client-secret" || args[i] == "--access-token" || args[i] == "--client-id" || args[i] == "--base-url":
 			return fmt.Errorf("%s is not supported; enter values interactively to avoid shell history exposure", args[i])
 		default:
 			return fmt.Errorf("unknown login flag %q", args[i])
@@ -131,33 +160,33 @@ func loginToken(authIO AuthIO) error {
 	return nil
 }
 
-func runAuthStatus(authIO AuthIO) error {
+func runAuthStatus(args []string, authIO AuthIO) error {
+	if len(args) != 0 {
+		return fmt.Errorf("auth status does not accept arguments")
+	}
 	path := ConfigPath()
 	report := authflow.StatusReport{ConfigPath: path}
-
-	baseURL, baseSource, err := ResolveBaseURL(path)
+	session, _, _, err := loadSessionSnapshot()
 	if err != nil {
 		return err
 	}
-	if baseURL != "" {
-		report.BaseURL = baseURL
-		report.BaseURLSource = baseSource
+	if session.BaseURL != "" {
+		report.BaseURL = session.BaseURL
+		report.BaseURLSource = session.BaseURLSource
 	}
-
-	creds, err := resolveCredentials(path)
-	if err != nil {
-		if strings.Contains(err.Error(), "not configured") {
-			return authflow.WriteJSON(authIO.Stdout, report)
-		}
-		return err
+	if !session.HasCredentials {
+		return authflow.WriteJSON(authIO.Stdout, report)
 	}
 	report.Configured = true
-	report.Mode = creds.Mode
-	report.CredentialSource = creds.Source
+	report.Mode = session.Credentials.Mode
+	report.CredentialSource = session.CredentialSource
 	return authflow.WriteJSON(authIO.Stdout, report)
 }
 
-func runAuthLogout(authIO AuthIO) error {
+func runAuthLogout(args []string, authIO AuthIO) error {
+	if len(args) != 0 {
+		return fmt.Errorf("auth logout does not accept arguments")
+	}
 	path := ConfigPath()
 	if err := ClearAuthConfig(path); err != nil {
 		return err
@@ -173,17 +202,21 @@ func runAuthLogout(authIO AuthIO) error {
 }
 
 func clearCachedClientCredentialsTokens() error {
-	path := restishauth.DefaultTokenCachePath()
+	path := restishengine.TokenCachePath(ConfigDir())
 	if path == "" {
 		return nil
 	}
-	if _, err := os.Lstat(path); err != nil {
+	info, err := os.Lstat(path)
+	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
 		return fmt.Errorf("stat PingCode token cache: %w", err)
 	}
-	if err := restishauth.NewTokenCache(path).DeletePrefix(""); err != nil {
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return fmt.Errorf("PingCode token cache must be a regular file and not a symlink: %s", path)
+	}
+	if err := restishauth.NewTokenCache(path).DeletePrefix("pingcode:"); err != nil {
 		return fmt.Errorf("clear PingCode token cache: %w", err)
 	}
 	return nil

@@ -7,19 +7,36 @@ import (
 	"os"
 	"strings"
 
+	"github.com/0xfe10/aicli/internal/authflow"
 	restishauth "github.com/rest-sh/restish/v2/auth"
 )
 
 // BearerAuth attaches the local FNS access token and enforces write-mode gates.
-type BearerAuth struct{}
+// Session must be bound at CLI construction so Base URL and credentials stay
+// consistent for the process lifetime.
+type BearerAuth struct {
+	Session Session
+}
 
 func (*BearerAuth) Parameters() []restishauth.Param { return nil }
 
 func (*BearerAuth) SupportsForce() {}
 
-func (*BearerAuth) Authenticate(_ context.Context, req *http.Request, ac restishauth.AuthContext) error {
-	if err := RejectPlaceholderBaseURL(ac.BaseURL); err != nil {
+func (a *BearerAuth) Authenticate(_ context.Context, req *http.Request, ac restishauth.AuthContext) error {
+	baseURL := strings.TrimSpace(a.Session.BaseURL)
+	if baseURL == "" {
+		baseURL = strings.TrimSpace(ac.BaseURL)
+	}
+	if err := RejectPlaceholderBaseURL(baseURL); err != nil {
 		return err
+	}
+	if req != nil {
+		if err := RejectPlaceholderBaseURL(req.URL.String()); err != nil {
+			return err
+		}
+		if err := authflow.RequestUnderBaseURL(req.URL, baseURL); err != nil {
+			return fmt.Errorf("refusing to attach FNS credentials: %w", err)
+		}
 	}
 	if err := enforceWriteMode(req.Method, os.Getenv("FNS_WRITE_MODE")); err != nil {
 		return err
@@ -28,11 +45,10 @@ func (*BearerAuth) Authenticate(_ context.Context, req *http.Request, ac restish
 		return fmt.Errorf("FNS %s request returned unauthorized; automatic retry is disabled for writes because the outcome is uncertain", strings.ToUpper(req.Method))
 	}
 
-	creds, err := ResolveCredentials()
-	if err != nil {
-		return err
+	if !a.Session.HasCredentials || strings.TrimSpace(a.Session.Credentials.AccessToken) == "" {
+		return fmt.Errorf("FNS authentication is not configured; run %q or set FNS_ACCESS_TOKEN", "fns auth login --mode token")
 	}
-	req.Header.Set("Authorization", "Bearer "+creds.AccessToken)
+	req.Header.Set("Authorization", "Bearer "+a.Session.Credentials.AccessToken)
 	return nil
 }
 

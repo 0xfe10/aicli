@@ -38,7 +38,8 @@ func TestPinnedSpecFile(t *testing.T) {
 		_, _ = w.Write(body)
 	})
 	stateDir := t.TempDir()
-	t.Setenv("RSH_CONFIG_DIR", filepath.Join(stateDir, "config"))
+	t.Setenv("XDG_CONFIG_HOME", stateDir)
+	t.Setenv("RSH_CACHE_DIR", filepath.Join(stateDir, "cache"))
 	t.Setenv("RSH_CACHE_DIR", filepath.Join(stateDir, "cache"))
 	t.Setenv("FNS_ACCESS_TOKEN", "token")
 	cfg := Config{BaseURL: server.URL, SpecURL: server.URL + "/openapi.yaml", Client: "aicli", Version: "test"}

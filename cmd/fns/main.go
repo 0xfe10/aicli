@@ -22,13 +22,13 @@ func main() {
 		return
 	}
 
-	cfg, err := fnsrt.LoadConfig(version)
+	session, cfg, err := fnsrt.LoadSession(version)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, fnsrt.RedactSecrets(err.Error()))
 		os.Exit(1)
 	}
-	cli := fnsrt.NewCLI(cfg, version, commit)
-	if err := cli.Run(os.Args); err != nil {
+	cli := fnsrt.NewCLIWithSession(cfg, session, version, commit)
+	if err := fnsrt.RunCLI(cli, os.Args); err != nil {
 		fmt.Fprintln(os.Stderr, fnsrt.RedactSecrets(err.Error()))
 		os.Exit(1)
 	}

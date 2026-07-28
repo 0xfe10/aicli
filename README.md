@@ -75,7 +75,7 @@ Configuration:
 - `PINGCODE_WRITE_MODE`: `readonly` (default), `write`, or `destructive`
 - `PINGCODE_API_BASE_URL`: defaults to `https://open.pingcode.com`
 - `PINGCODE_SPEC_URL`: defaults to `https://open.pingcode.com/api_data.json`
-- `RSH_CONFIG`, `RSH_CONFIG_DIR`, and `RSH_CACHE_DIR`: optional Restish state overrides
+- `RSH_CACHE_DIR`: optional Restish HTTP/spec cache override; branded CLIs ignore Restish config overrides
 
 ## Fast Note Sync (`fns`)
 
@@ -114,6 +114,9 @@ export FNS_WRITE_MODE=destructive  # also allow DELETE / recycle-clear
 The compile-time default Base URL (`https://fns.example.com`) is a placeholder so
 `fns --help` works. Real API requests fail until you run `fns auth login` or set
 `FNS_BASE_URL`. See [unified CLI auth](openwiki/decisions/unified-cli-auth.md).
+
+Branded CLIs do not use Restish `restish.json` for Base URL or credentials;
+`--rsh-config` is ignored. `RSH_CACHE_DIR` may still be set for Restish caches.
 
 First release exposes Note/File/Folder commands only. Restish owns argument
 encoding, multipart upload, binary download, and output formatting:

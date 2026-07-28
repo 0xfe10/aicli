@@ -16,20 +16,25 @@ var (
 func main() {
 	if handled, err := pingcodert.MaybeRunAuth(os.Args); handled {
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, pingcodert.RedactSecrets(err.Error()))
 			os.Exit(1)
 		}
 		return
 	}
 
-	cfg, err := pingcodert.LoadConfig()
+	session, err := pingcodert.LoadSession()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, pingcodert.RedactSecrets(err.Error()))
 		os.Exit(1)
 	}
-	cli := pingcodert.NewCLI(cfg, version, commit)
-	if err := cli.Run(os.Args); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	cfg, err := pingcodert.ConfigFromSession(session)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, pingcodert.RedactSecrets(err.Error()))
+		os.Exit(1)
+	}
+	cli := pingcodert.NewCLIWithSession(cfg, session, version, commit)
+	if err := pingcodert.RunCLI(cli, os.Args); err != nil {
+		fmt.Fprintln(os.Stderr, pingcodert.RedactSecrets(err.Error()))
 		os.Exit(1)
 	}
 }
