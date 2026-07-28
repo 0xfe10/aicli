@@ -1,6 +1,7 @@
 # FNS CLI
 
-`fns` embeds Restish v2.3.0 and generates Note/File/Folder commands from the
+`fns` embeds Restish v2.3.0 and generates Note/File/Folder commands and a
+read-only Vault list command from the
 Fast Note Sync API description.
 
 ## Runtime path
@@ -28,10 +29,12 @@ the pinned commit `b6b4566352f39e0404530ed1b58248a815a6d763`. Do not switch the 
 ## First-release scope
 
 Open: `/api/note*`, `/api/notes*`, `/api/file*`, `/api/files*`, `/api/folder*`, `/api/folders*`
-(excluding paths that contain `/share`).
+(excluding paths that contain `/share`) and only `GET /api/vault` for vault discovery.
 
-Deferred: OAuth, Share admin, Vault management, Backup, Storage, WebGUI-only APIs.
-Server-side OpenAPI 3 publication and Vault REST consistency are tracked as M9.
+Deferred: OAuth, Share admin, Vault mutation, Backup, Storage, and other WebGUI-only APIs.
+The deployed FNS server must permit REST tokens to call `GET /api/vault`; older
+servers return `Auth token Client restricted` until that server-side route is updated.
+Server-side OpenAPI 3 publication remains tracked as M9.
 
 ## Binary size note
 

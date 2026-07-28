@@ -26,9 +26,9 @@ safety:
     write: [GET, HEAD, OPTIONS, POST, PUT, PATCH]
     destructive: [GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE]
 notes:
-  - Restish generates Note/File/Folder commands from the remote Swagger description.
+  - Restish generates Note/File/Folder commands and read-only Vault discovery from the remote Swagger description.
   - swagger2rt converts Swagger 2 to OpenAPI 3; fnsrt applies FNS-specific contract fixes.
-  - First release hides Vault, Admin, Auth, Share, Backup, Storage, and WebGUI routes.
+  - Vault mutation, Admin, Auth, Share, Backup, Storage, and WebGUI routes remain hidden.
   - Tokens are created in FNS WebGUI with permissions such as p:rest c:aicli f:note_rw,file_rw.
 openwiki:
   overview: openwiki/architecture/cli-platform.md

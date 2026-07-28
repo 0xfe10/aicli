@@ -48,12 +48,13 @@ func TestPinnedSpecFile(t *testing.T) {
 		{"fns", "note", "--help"},
 		{"fns", "file", "--help"},
 		{"fns", "folder", "--help"},
+		{"fns", "vault", "--help"},
 	} {
 		help := runHelp(t, cfg, args)
 		if !strings.Contains(help, "Additional Commands:") && !strings.Contains(help, "Available Commands:") {
 			t.Fatalf("%v missing command listing:\n%s", args, help)
 		}
-		for _, blocked := range []string{"\n  vault ", "\n  admin ", "\n  auth "} {
+		for _, blocked := range []string{"\n  admin ", "\n  auth "} {
 			if strings.Contains(help, blocked) {
 				t.Fatalf("%v exposed blocked command %q:\n%s", args, blocked, help)
 			}

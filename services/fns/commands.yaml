@@ -3,9 +3,9 @@ surface:
   generation: runtime
   layout: tags
   naming: restish-method-and-path-fallback
-  coverage: note-file-folder-first-release
+  coverage: note-file-folder-and-vault-discovery
   excluded:
-    - Vault, Admin, Auth, Share, Backup, Storage, and WebGUI routes
+    - Vault mutation, Admin, Auth, Share, Backup, Storage, and WebGUI routes
     - duplicate required token header parameters after Bearer conversion
 support_commands:
   namespace: fns cli
@@ -16,6 +16,8 @@ support_commands:
 examples:
   - name: fns auth login --mode token
     mode: setup
+  - name: fns vault get-api-vault
+    mode: read
   - name: fns note get-api-note Notes/test.md genesis
     mode: read
   - name: fns file get-api-file assets/test.png genesis

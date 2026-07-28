@@ -118,11 +118,13 @@ The compile-time default Base URL (`https://fns.example.com`) is a placeholder s
 Branded CLIs do not use Restish `restish.json` for Base URL or credentials;
 `--rsh-config` is ignored. `RSH_CACHE_DIR` may still be set for Restish caches.
 
-First release exposes Note/File/Folder commands only. Restish owns argument
+The CLI exposes Note/File/Folder commands plus the read-only Vault list command.
+Vault creation, update, deletion, and index rebuild remain excluded. Restish owns argument
 encoding, multipart upload, binary download, and output formatting:
 
 ```sh
 go run ./cmd/fns --help
+go run ./cmd/fns vault get-api-vault -o table
 go run ./cmd/fns note get-api-note Notes/test.md genesis -o json
 go run ./cmd/fns file get-api-file assets/test.png genesis > test.png
 go run ./cmd/fns file post-api-file 'vault: genesis, path: assets/test.bin, file: @./test.bin'

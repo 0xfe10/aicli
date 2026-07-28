@@ -20,6 +20,8 @@ var allowedPathPrefixes = []string{
 	"/api/folders",
 }
 
+const vaultListPath = "/api/vault"
+
 // FixSpec applies FNS-specific OpenAPI corrections after normalization.
 // It never invents operations; it only filters and rewrites auth/server metadata.
 func FixSpec(openAPI3 []byte) ([]byte, error) {
@@ -56,11 +58,14 @@ func fixDocument(doc map[string]any) error {
 		if pathItem == nil {
 			continue
 		}
+		if path == vaultListPath {
+			keepOnlyHTTPMethod(pathItem, "get")
+		}
 		stripTokenParameters(pathItem)
 		filtered[path] = pathItem
 	}
 	if len(filtered) == 0 {
-		return fmt.Errorf("FNS OpenAPI document has no Note/File/Folder operations after filtering")
+		return fmt.Errorf("FNS OpenAPI document has no Note/File/Folder/Vault-list operations after filtering")
 	}
 	doc["paths"] = filtered
 
@@ -84,6 +89,9 @@ func fixDocument(doc map[string]any) error {
 }
 
 func pathAllowed(path string) bool {
+	if path == vaultListPath {
+		return true
+	}
 	if strings.Contains(path, "/share") {
 		return false
 	}
@@ -93,6 +101,14 @@ func pathAllowed(path string) bool {
 		}
 	}
 	return false
+}
+
+func keepOnlyHTTPMethod(pathItem map[string]any, allowed string) {
+	for _, method := range []string{"get", "post", "put", "patch", "delete", "head", "options", "trace"} {
+		if method != allowed {
+			delete(pathItem, method)
+		}
+	}
 }
 
 func stripTokenParameters(pathItem map[string]any) {

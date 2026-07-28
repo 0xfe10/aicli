@@ -29,3 +29,4 @@ note put-api-note-restore
 note-history get-api-note-histories
 note-history get-api-note-history
 note-history put-api-note-history-restore
+vault get-api-vault

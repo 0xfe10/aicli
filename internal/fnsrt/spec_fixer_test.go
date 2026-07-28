@@ -31,9 +31,21 @@ func TestFixSpecFiltersAndRewritesAuth(t *testing.T) {
 					t.Fatalf("unexpected path kept: %s", path)
 				}
 			}
-			for _, blocked := range []string{"/api/vault", "/api/vault/get", "/api/admin/config", "/api/auth/logout", "/api/share", "/api/backup/configs", "/api/storage", "/api/webgui"} {
+			for _, blocked := range []string{"/api/vault/get", "/api/admin/config", "/api/auth/logout", "/api/share", "/api/backup/configs", "/api/storage", "/api/webgui"} {
 				if _, ok := paths[blocked]; ok {
 					t.Fatalf("blocked path still present: %s", blocked)
+				}
+			}
+			vault, ok := paths[vaultListPath].(map[string]any)
+			if !ok {
+				t.Fatal("missing required vault list path")
+			}
+			if _, ok := vault["get"]; !ok {
+				t.Fatal("missing required vault list operation")
+			}
+			for _, blockedMethod := range []string{"post", "put", "patch", "delete"} {
+				if _, ok := vault[blockedMethod]; ok {
+					t.Fatalf("vault management method still present: %s", blockedMethod)
 				}
 			}
 			for _, required := range []string{"/api/note", "/api/file", "/api/folder", "/api/notes", "/api/files", "/api/folders"} {

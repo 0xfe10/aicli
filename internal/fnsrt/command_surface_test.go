@@ -80,10 +80,17 @@ func TestOpenAPI3DoesNotBypassFixSpec(t *testing.T) {
 		t.Fatal("servers should be removed from OpenAPI 3 input")
 	}
 	paths, _ := doc["paths"].(map[string]any)
-	for _, blocked := range []string{"/api/vault", "/api/vault/get", "/api/admin/config", "/api/auth/logout"} {
+	for _, blocked := range []string{"/api/vault/get", "/api/admin/config", "/api/auth/logout"} {
 		if _, ok := paths[blocked]; ok {
 			t.Fatalf("blocked path kept after OpenAPI 3 fix: %s", blocked)
 		}
+	}
+	vault, _ := paths[vaultListPath].(map[string]any)
+	if _, ok := vault["get"]; !ok {
+		t.Fatal("vault list operation missing after OpenAPI 3 fix")
+	}
+	if _, ok := vault["post"]; ok {
+		t.Fatal("vault management operation kept after OpenAPI 3 fix")
 	}
 	schemes, _ := doc["components"].(map[string]any)["securitySchemes"].(map[string]any)
 	user, _ := schemes[securitySchemeName].(map[string]any)
@@ -164,7 +171,7 @@ func captureCommandTree(t *testing.T, spec []byte) []string {
 	var approved []string
 	for _, group := range groups {
 		switch group {
-		case "note", "note-history", "file", "folder":
+		case "note", "note-history", "file", "folder", "vault":
 			approved = append(approved, group)
 		case "cli", "help", "completion", "version":
 			continue
@@ -202,11 +209,11 @@ func assertApprovedCommandTree(t *testing.T, tree []string) {
 			t.Fatalf("bad entry %q", entry)
 		}
 		switch parts[0] {
-		case "note", "note-history", "file", "folder":
+		case "note", "note-history", "file", "folder", "vault":
 		default:
 			t.Fatalf("unapproved group in %q", entry)
 		}
-		for _, blocked := range []string{"vault", "admin", "auth", "backup", "storage", "webgui", "share"} {
+		for _, blocked := range []string{"admin", "auth", "backup", "storage", "webgui", "share"} {
 			if parts[0] == blocked || strings.Contains(parts[1], blocked) {
 				t.Fatalf("blocked command present: %q", entry)
 			}
