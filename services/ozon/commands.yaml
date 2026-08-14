@@ -1,0 +1,19 @@
+surface:
+  source: pinned-full-seller-openapi
+  generation: runtime
+  layout: tags
+  naming: upstream-operation-id-with-tag-prefix-removed
+  coverage: all-operations
+support_commands:
+  namespace: ozon cli
+  auth:
+    - auth login --mode key
+    - auth status
+    - auth logout
+write_policy:
+  environment: OZON_WRITE_MODE
+  default: readonly
+  write: permits operations classified write
+  destructive: also permits operations classified destructive
+output:
+  owner: restish

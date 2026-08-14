@@ -1,0 +1,42 @@
+{
+  "openapi": "3.0.0",
+  "info": {"title": "Ozon test", "version": "1"},
+  "servers": [{"url": "//wrong.example"}],
+  "components": {
+    "parameters": {
+      "Client-Id": {"name": "Client-Id", "in": "header", "required": true, "schema": {"type": "string"}},
+      "Api-Key": {"name": "Api-Key", "in": "header", "required": true, "schema": {"type": "string"}}
+    },
+    "schemas": {"rpcStatus": {"type": "object"}}
+  },
+  "paths": {
+    "/v1/product/list": {
+      "post": {
+        "tags": ["ProductAPI"],
+        "operationId": "ProductAPI_GetProductList",
+        "parameters": [
+          {"$ref": "#/components/parameters/Client-Id"},
+          {"$ref": "#/components/parameters/Api-Key"}
+        ],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object"}}}},
+        "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}
+      }
+    },
+    "/v3/product/import": {
+      "post": {
+        "tags": ["ProductAPI"],
+        "operationId": "ProductAPI_ImportProductsV3",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object"}}}},
+        "responses": {"200": {"description": "OK"}}
+      }
+    },
+    "/v1/product/archive": {
+      "post": {
+        "tags": ["ProductAPI"],
+        "operationId": "ProductAPI_ProductArchive",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object"}}}},
+        "responses": {"200": {"description": "OK"}, "400": {"description": "bad", "content": {"application/json": {"schema": {"$ref": "../../components/schemas/rpcStatus.yaml"}}}}}
+      }
+    }
+  }
+}

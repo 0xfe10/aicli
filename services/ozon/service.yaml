@@ -1,0 +1,26 @@
+id: ozon
+name: Ozon Seller
+status: active
+implementation:
+  type: go-command
+  repository: https://github.com/0xfe10/aicli
+  package: ./cmd/ozon
+  command: ozon
+  transport: embedded-restish-v2.3.0
+  api_description: https://raw.githubusercontent.com/PCDCK/ozon-mcp/7e1bea2dd7510064311f1d357d014bb012a18847/src/ozon_mcp/data/seller_swagger.json
+  api_description_format: openapi-3.0
+authentication:
+  supported: [client-id-api-key]
+  default: client-id-api-key
+  local_commands:
+    - auth login --mode key
+    - auth status
+    - auth logout
+  config_path: $XDG_CONFIG_HOME/aicli/ozon/config.toml
+  environment_override: true
+safety:
+  write_mode_default: readonly
+  classification: operation-id-and-path
+notes:
+  - Restish generates every operation command from the pinned Seller OpenAPI snapshot.
+  - The local adapter repairs invalid schema metadata and owns authentication and write safety.

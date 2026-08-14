@@ -21,5 +21,11 @@ func Services() []Service {
 			Status:  "active",
 			Command: "fns",
 		},
+		{
+			ID:      "ozon",
+			Name:    "Ozon Seller",
+			Status:  "active",
+			Command: "ozon",
+		},
 	}
 }

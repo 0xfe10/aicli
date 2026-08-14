@@ -8,10 +8,11 @@ a separate Restish installation is not needed.
 
 ## Structure
 
-- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`).
+- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`, `ozon`).
 - `internal/pingcodert/` adapts PingCode's API description and authentication to Restish.
 - `internal/swagger2rt/` converts Swagger / OpenAPI 2 documents to OpenAPI 3 for Restish.
 - `internal/fnsrt/` adapts Fast Note Sync (FNS) specs, auth, and write safety to Restish.
+- `internal/ozonrt/` repairs the Ozon Seller OpenAPI and applies header auth and operation-level write safety.
 - `internal/cli/` contains JSON helpers used by the `aicli` registry command.
 - `services/` contains service registrations and command-surface metadata.
 - `openwiki/` contains repository knowledge and architecture decisions.
@@ -134,12 +135,40 @@ The default `FNS_SPEC_URL` is pinned to FNS commit `b6b4566352f39e0404530ed1b582
 publishes a stable OpenAPI endpoint. Override `FNS_SPEC_URL` only when you
 intentionally need another description.
 
+## Ozon Seller (`ozon`)
+
+The `ozon` binary exposes the complete command surface from a pinned Ozon Seller
+OpenAPI snapshot. Save `Client-Id` and `Api-Key` interactively:
+
+```sh
+ozon auth login --mode key
+ozon auth status
+ozon --help
+ozon product-api --help
+```
+
+Environment variables override local configuration:
+
+```sh
+export OZON_CLIENT_ID='...'
+export OZON_API_KEY='...'
+export OZON_WRITE_MODE=write        # allow operations classified as writes
+export OZON_WRITE_MODE=destructive  # also allow destructive operations
+```
+
+`OZON_BASE_URL` and `OZON_SPEC_URL` override the defaults. The default spec URL
+is pinned because Ozon does not currently publish a stable raw OpenAPI URL that
+this project can consume directly. The adapter removes credential parameters,
+repairs known invalid schema metadata, and generates all operations at runtime.
+
 ## Build and verify
 
 ```sh
 just verify
 just test-fns
+just test-ozon
 just fns-spec-check
+just ozon-spec-check
 just verify-fns
 just pingcode-spec-check
 just compliance-check
