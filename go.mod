@@ -3,6 +3,7 @@ module github.com/0xfe10/aicli
 go 1.25.3
 
 require (
+	github.com/fxamacker/cbor/v2 v2.9.1
 	github.com/getkin/kin-openapi v0.145.0
 	github.com/pb33f/libopenapi v0.35.0
 	github.com/pelletier/go-toml/v2 v2.4.3
@@ -31,7 +32,6 @@ require (
 	github.com/danielgtaylor/mexpr v1.10.1 // indirect
 	github.com/danielgtaylor/shorthand/v2 v2.4.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
-	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/go-openapi/jsonpointer v0.22.5 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.5 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect

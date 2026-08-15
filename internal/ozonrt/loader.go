@@ -2,16 +2,21 @@ package ozonrt
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/pb33f/libopenapi"
 	restish "github.com/rest-sh/restish/v2"
+	restishconfig "github.com/rest-sh/restish/v2/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -273,11 +278,51 @@ type safetyRoute struct {
 	Level  string
 }
 
+type cachedSpecPolicyEntry struct {
+	Spec struct {
+		Raw []byte `cbor:"raw"`
+	} `cbor:"spec"`
+	Raw []byte `cbor:"raw"`
+}
+
 func (p *SafetyPolicy) Replace(routes []safetyRoute) {
 	sort.Slice(routes, func(i, j int) bool { return routes[i].Path < routes[j].Path })
 	p.mu.Lock()
 	p.routes = routes
 	p.mu.Unlock()
+}
+
+func (p *SafetyPolicy) Ready() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return len(p.routes) != 0
+}
+
+func (p *SafetyPolicy) PrimeFromSpecCache(cacheDir, configPath, apiName string) {
+	if p == nil || cacheDir == "" || configPath == "" || apiName == "" {
+		return
+	}
+	data, err := os.ReadFile(specCachePath(cacheDir, configPath, apiName))
+	if err != nil {
+		return
+	}
+	var entry cachedSpecPolicyEntry
+	if err := cbor.Unmarshal(data, &entry); err != nil {
+		return
+	}
+	raw := entry.Spec.Raw
+	if len(raw) == 0 {
+		raw = entry.Raw
+	}
+	if _, routes, err := fixSpec(raw); err == nil {
+		p.Replace(routes)
+	}
+}
+
+func specCachePath(cacheDir, configPath, apiName string) string {
+	configPath = restishconfig.NewPathsWithConfigFile(configPath).ConfigFile()
+	sum := sha256.Sum256([]byte(configPath))
+	return filepath.Join(cacheDir, "specs", "configs", fmt.Sprintf("%x", sum[:8]), apiName+".cbor")
 }
 
 func (p *SafetyPolicy) Allow(method, path, rawMode string) error {

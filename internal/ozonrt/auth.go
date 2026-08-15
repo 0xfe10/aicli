@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/0xfe10/aicli/internal/authflow"
+	"github.com/0xfe10/aicli/internal/restishengine"
 	restishauth "github.com/rest-sh/restish/v2/auth"
 )
 
@@ -27,6 +28,9 @@ func (a *HeaderAuth) Authenticate(_ context.Context, req *http.Request, ac resti
 	}
 	if a.Policy == nil {
 		return fmt.Errorf("Ozon safety policy is unavailable")
+	}
+	if !a.Policy.Ready() {
+		a.Policy.PrimeFromSpecCache(os.Getenv("RSH_CACHE_DIR"), restishengine.ConfigPath(ConfigDir()), "ozon")
 	}
 	if level, found := a.Policy.level(req.Method, req.URL.Path); ac.Force && found && level != "read" {
 		return fmt.Errorf("Ozon %s request returned unauthorized; automatic retry is disabled for %s operations because the outcome is uncertain", strings.ToUpper(req.Method), level)

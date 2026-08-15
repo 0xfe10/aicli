@@ -7,9 +7,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/fxamacker/cbor/v2"
 	restish "github.com/rest-sh/restish/v2"
 )
 
@@ -75,6 +77,29 @@ func TestSafetyPolicyUsesOperationSemanticsForPOST(t *testing.T) {
 	}
 }
 
+func TestSafetyPolicyPrimesFromLegacyRawSpecCache(t *testing.T) {
+	cacheDir := t.TempDir()
+	configPath := filepath.Join(t.TempDir(), "restish.json")
+	cachePath := specCachePath(cacheDir, configPath, "ozon")
+	data, err := cbor.Marshal(struct {
+		Raw []byte `cbor:"raw"`
+	}{Raw: fixture(t)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(cachePath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cachePath, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	policy := &SafetyPolicy{}
+	policy.PrimeFromSpecCache(cacheDir, configPath, "ozon")
+	if err := policy.Allow(http.MethodPost, "/v1/product/list", ""); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSafetyOverridesAmbiguousPOSTRoutes(t *testing.T) {
 	checks := map[string]string{
 		"/v2/chat/read":                      "write",
@@ -114,6 +139,52 @@ func TestGeneratedReadCommandInjectsHeaders(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), `"ok": true`) {
 		t.Fatalf("stdout = %s", stdout.String())
+	}
+}
+
+func TestGeneratedReadCommandUsesSafetyPolicyWithOperationCache(t *testing.T) {
+	var specHits, apiHits int
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	mux.HandleFunc("/openapi.json", func(w http.ResponseWriter, _ *http.Request) {
+		specHits++
+		_, _ = w.Write(fixture(t))
+	})
+	mux.HandleFunc("/v1/product/list", func(w http.ResponseWriter, _ *http.Request) {
+		apiHits++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	})
+	configRoot := t.TempDir()
+	if runtime.GOOS != "windows" {
+		linkedRoot := filepath.Join(t.TempDir(), "config-link")
+		if err := os.Symlink(configRoot, linkedRoot); err != nil {
+			t.Fatal(err)
+		}
+		configRoot = linkedRoot
+	}
+	t.Setenv("XDG_CONFIG_HOME", configRoot)
+	t.Setenv("RSH_CACHE_DIR", filepath.Join(t.TempDir(), "cache"))
+	session := Session{BaseURL: server.URL, HasCredentials: true, Credentials: Credentials{ClientID: "client", APIKey: "secret"}}
+	cfg := Config{BaseURL: server.URL, SpecURL: server.URL + "/openapi.json"}
+	run := func() error {
+		cli := NewCLIWithSession(cfg, session, "test", "")
+		cli.Stdin = strings.NewReader(`{}`)
+		cli.Stdout, cli.Stderr = &bytes.Buffer{}, &bytes.Buffer{}
+		return RunCLI(cli, []string{"ozon", "product-api", "get-product-list", "-o", "json"})
+	}
+	if err := run(); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	if err := run(); err != nil {
+		t.Fatalf("second run from operation cache: %v", err)
+	}
+	if specHits != 1 {
+		t.Fatalf("spec hits = %d, want 1", specHits)
+	}
+	if apiHits != 2 {
+		t.Fatalf("api hits = %d, want 2", apiHits)
 	}
 }
 
