@@ -14,8 +14,9 @@ import (
 )
 
 type HeaderAuth struct {
-	Session Session
-	Policy  *SafetyPolicy
+	Session  Session
+	Policy   *SafetyPolicy
+	StateDir string
 }
 
 func (*HeaderAuth) Parameters() []restishauth.Param { return nil }
@@ -30,7 +31,11 @@ func (a *HeaderAuth) Authenticate(_ context.Context, req *http.Request, ac resti
 		return fmt.Errorf("Ozon safety policy is unavailable")
 	}
 	if !a.Policy.Ready() {
-		a.Policy.PrimeFromSpecCache(os.Getenv("RSH_CACHE_DIR"), restishengine.ConfigPath(ConfigDir()), "ozon")
+		stateDir := a.StateDir
+		if stateDir == "" {
+			stateDir = ConfigDir()
+		}
+		a.Policy.PrimeFromSpecCache(os.Getenv("RSH_CACHE_DIR"), restishengine.ConfigPath(stateDir), "ozon")
 	}
 	if level, found := a.Policy.level(req.Method, req.URL.Path); ac.Force && found && level != "read" {
 		return fmt.Errorf("Ozon %s request returned unauthorized; automatic retry is disabled for %s operations because the outcome is uncertain", strings.ToUpper(req.Method), level)

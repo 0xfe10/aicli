@@ -5,20 +5,31 @@ import (
 	"strings"
 
 	"github.com/0xfe10/aicli/internal/authflow"
+	"github.com/0xfe10/aicli/internal/contextflow"
 )
 
 type AuthIO = authflow.IO
 
 func MaybeRunAuth(args []string) (bool, error) {
+	return MaybeRunAuthWithContext(args, contextManager.DefaultSelection())
+}
+
+// MaybeRunAuthWithContext handles auth for one selected context.
+func MaybeRunAuthWithContext(args []string, selection contextflow.Selection) (bool, error) {
 	authArgs, handled, err := authflow.LocalCommandArgs(args, "auth")
 	if err != nil || !handled {
 		return handled, err
 	}
-	configureStatePaths()
-	return true, RunAuth(authArgs, authflow.DefaultIO())
+	configureStatePathsFor(selection)
+	return true, RunAuthWithContext(authArgs, authflow.DefaultIO(), selection)
 }
 
 func RunAuth(args []string, authIO AuthIO) error {
+	return RunAuthWithContext(args, authIO, contextManager.DefaultSelection())
+}
+
+// RunAuthWithContext executes auth commands against selection.
+func RunAuthWithContext(args []string, authIO AuthIO, selection contextflow.Selection) error {
 	authIO = authIO.Normalize()
 	if len(args) == 0 || authflow.IsHelpArg(args[0]) {
 		fmt.Fprint(authIO.Stdout, authHelp())
@@ -26,11 +37,11 @@ func RunAuth(args []string, authIO AuthIO) error {
 	}
 	switch args[0] {
 	case "login":
-		return authLogin(args[1:], authIO)
+		return authLogin(args[1:], authIO, selection)
 	case "status":
-		return authStatus(args[1:], authIO)
+		return authStatus(args[1:], authIO, selection)
 	case "logout":
-		return authLogout(args[1:], authIO)
+		return authLogout(args[1:], authIO, selection)
 	default:
 		return fmt.Errorf("unknown auth command %q\n\n%s", args[0], authHelp())
 	}
@@ -47,7 +58,7 @@ The Api-Key is entered interactively and is never accepted on argv.
 `
 }
 
-func authLogin(args []string, authIO AuthIO) error {
+func authLogin(args []string, authIO AuthIO, selection contextflow.Selection) error {
 	mode := ""
 	for i := 0; i < len(args); i++ {
 		switch {
@@ -81,27 +92,29 @@ func authLogin(args []string, authIO AuthIO) error {
 	if err != nil {
 		return err
 	}
-	if err := SaveLogin(ConfigPath(), baseURL, &AuthConfig{Mode: AuthModeKey, ClientID: clientID, APIKey: apiKey}); err != nil {
+	if err := SaveLogin(ConfigPathFor(selection), baseURL, &AuthConfig{Mode: AuthModeKey, ClientID: clientID, APIKey: apiKey}); err != nil {
 		return err
 	}
 	fmt.Fprintln(authIO.Stdout, "Credentials saved.")
 	return nil
 }
 
-func authStatus(args []string, authIO AuthIO) error {
+func authStatus(args []string, authIO AuthIO, selection contextflow.Selection) error {
 	if len(args) != 0 {
 		return fmt.Errorf("auth status does not accept arguments")
 	}
-	session, _, err := LoadSession()
+	session, _, err := LoadSessionWithContext(selection)
 	if err != nil {
 		return err
 	}
 	report := authflow.StatusReport{
 		Configured:       session.HasCredentials,
+		Context:          selection.Name,
+		ContextSource:    selection.Source,
 		BaseURL:          session.BaseURL,
 		BaseURLSource:    session.BaseURLSource,
 		CredentialSource: session.CredentialSource,
-		ConfigPath:       ConfigPath(),
+		ConfigPath:       ConfigPathFor(selection),
 	}
 	if session.HasCredentials {
 		report.Mode = AuthModeKey
@@ -109,11 +122,11 @@ func authStatus(args []string, authIO AuthIO) error {
 	return authflow.WriteJSON(authIO.Stdout, report)
 }
 
-func authLogout(args []string, authIO AuthIO) error {
+func authLogout(args []string, authIO AuthIO, selection contextflow.Selection) error {
 	if len(args) != 0 {
 		return fmt.Errorf("auth logout does not accept arguments")
 	}
-	if err := ClearAuthConfig(ConfigPath()); err != nil {
+	if err := ClearAuthConfig(ConfigPathFor(selection)); err != nil {
 		return err
 	}
 	fmt.Fprintln(authIO.Stdout, "Credentials removed.")

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/0xfe10/aicli/internal/authflow"
+	"github.com/0xfe10/aicli/internal/contextflow"
 	"github.com/0xfe10/aicli/internal/restishengine"
 	restishauth "github.com/rest-sh/restish/v2/auth"
 )
@@ -20,16 +21,26 @@ func defaultAuthIO() AuthIO {
 // MaybeRunAuth handles `pingcode auth ...` before Restish sees argv.
 // handled is true when args select the auth control plane.
 func MaybeRunAuth(args []string) (handled bool, err error) {
+	return MaybeRunAuthWithContext(args, contextManager.DefaultSelection())
+}
+
+// MaybeRunAuthWithContext handles auth for one selected context.
+func MaybeRunAuthWithContext(args []string, selection contextflow.Selection) (handled bool, err error) {
 	authArgs, handled, err := authflow.LocalCommandArgs(args, "auth")
 	if err != nil || !handled {
 		return handled, err
 	}
-	configureStatePaths()
-	return true, RunAuth(authArgs, defaultAuthIO())
+	configureStatePathsFor(selection)
+	return true, RunAuthWithContext(authArgs, defaultAuthIO(), selection)
 }
 
 // RunAuth executes login/status/logout subcommands.
 func RunAuth(args []string, authIO AuthIO) error {
+	return RunAuthWithContext(args, authIO, contextManager.DefaultSelection())
+}
+
+// RunAuthWithContext executes auth commands against selection.
+func RunAuthWithContext(args []string, authIO AuthIO, selection contextflow.Selection) error {
 	authIO = authIO.Normalize()
 	if len(args) == 0 || authflow.IsHelpArg(args[0]) {
 		fmt.Fprint(authIO.Stdout, authHelpText())
@@ -37,11 +48,11 @@ func RunAuth(args []string, authIO AuthIO) error {
 	}
 	switch args[0] {
 	case "login":
-		return runAuthLogin(args[1:], authIO)
+		return runAuthLogin(args[1:], authIO, selection)
 	case "status":
-		return runAuthStatus(args[1:], authIO)
+		return runAuthStatus(args[1:], authIO, selection)
 	case "logout":
-		return runAuthLogout(args[1:], authIO)
+		return runAuthLogout(args[1:], authIO, selection)
 	default:
 		return fmt.Errorf("unknown auth command %q\n\n%s", args[0], authHelpText())
 	}
@@ -70,7 +81,7 @@ Prompts:
 `
 }
 
-func runAuthLogin(args []string, authIO AuthIO) error {
+func runAuthLogin(args []string, authIO AuthIO, selection contextflow.Selection) error {
 	mode := ""
 	for i := 0; i < len(args); i++ {
 		switch {
@@ -92,9 +103,9 @@ func runAuthLogin(args []string, authIO AuthIO) error {
 	mode = strings.TrimSpace(mode)
 	switch mode {
 	case AuthModeClient:
-		return loginClient(authIO)
+		return loginClient(authIO, selection)
 	case AuthModeToken:
-		return loginToken(authIO)
+		return loginToken(authIO, selection)
 	case "":
 		return fmt.Errorf("usage: pingcode auth login --mode client|token")
 	default:
@@ -102,7 +113,7 @@ func runAuthLogin(args []string, authIO AuthIO) error {
 	}
 }
 
-func loginClient(authIO AuthIO) error {
+func loginClient(authIO AuthIO, selection contextflow.Selection) error {
 	baseURL, err := authflow.PromptBaseURL(authIO)
 	if err != nil {
 		return err
@@ -121,21 +132,21 @@ func loginClient(authIO AuthIO) error {
 	if strings.TrimSpace(secret) == "" {
 		return fmt.Errorf("Client Secret is required")
 	}
-	if err := SaveLogin(ConfigPath(), baseURL, &AuthConfig{
+	if err := SaveLogin(ConfigPathFor(selection), baseURL, &AuthConfig{
 		Mode:         AuthModeClient,
 		ClientID:     clientID,
 		ClientSecret: strings.TrimSpace(secret),
 	}); err != nil {
 		return err
 	}
-	if err := clearCachedClientCredentialsTokens(); err != nil {
+	if err := clearCachedClientCredentialsTokensFor(selection); err != nil {
 		return err
 	}
 	fmt.Fprintln(authIO.Stdout, "Credentials saved.")
 	return nil
 }
 
-func loginToken(authIO AuthIO) error {
+func loginToken(authIO AuthIO, selection contextflow.Selection) error {
 	baseURL, err := authflow.PromptBaseURL(authIO)
 	if err != nil {
 		return err
@@ -147,26 +158,26 @@ func loginToken(authIO AuthIO) error {
 	if strings.TrimSpace(token) == "" {
 		return fmt.Errorf("Access Token is required")
 	}
-	if err := SaveLogin(ConfigPath(), baseURL, &AuthConfig{
+	if err := SaveLogin(ConfigPathFor(selection), baseURL, &AuthConfig{
 		Mode:        AuthModeToken,
 		AccessToken: strings.TrimSpace(token),
 	}); err != nil {
 		return err
 	}
-	if err := clearCachedClientCredentialsTokens(); err != nil {
+	if err := clearCachedClientCredentialsTokensFor(selection); err != nil {
 		return err
 	}
 	fmt.Fprintln(authIO.Stdout, "Credentials saved.")
 	return nil
 }
 
-func runAuthStatus(args []string, authIO AuthIO) error {
+func runAuthStatus(args []string, authIO AuthIO, selection contextflow.Selection) error {
 	if len(args) != 0 {
 		return fmt.Errorf("auth status does not accept arguments")
 	}
-	path := ConfigPath()
-	report := authflow.StatusReport{ConfigPath: path}
-	session, _, _, err := loadSessionSnapshot()
+	path := ConfigPathFor(selection)
+	report := authflow.StatusReport{Context: selection.Name, ContextSource: selection.Source, ConfigPath: path}
+	session, _, _, err := loadSessionSnapshotWithContext(selection)
 	if err != nil {
 		return err
 	}
@@ -183,15 +194,15 @@ func runAuthStatus(args []string, authIO AuthIO) error {
 	return authflow.WriteJSON(authIO.Stdout, report)
 }
 
-func runAuthLogout(args []string, authIO AuthIO) error {
+func runAuthLogout(args []string, authIO AuthIO, selection contextflow.Selection) error {
 	if len(args) != 0 {
 		return fmt.Errorf("auth logout does not accept arguments")
 	}
-	path := ConfigPath()
+	path := ConfigPathFor(selection)
 	if err := ClearAuthConfig(path); err != nil {
 		return err
 	}
-	if err := clearCachedClientCredentialsTokens(); err != nil {
+	if err := clearCachedClientCredentialsTokensFor(selection); err != nil {
 		return err
 	}
 	fmt.Fprintln(authIO.Stdout, "Credentials removed.")
@@ -202,7 +213,11 @@ func runAuthLogout(args []string, authIO AuthIO) error {
 }
 
 func clearCachedClientCredentialsTokens() error {
-	path := restishengine.TokenCachePath(ConfigDir())
+	return clearCachedClientCredentialsTokensFor(contextManager.DefaultSelection())
+}
+
+func clearCachedClientCredentialsTokensFor(selection contextflow.Selection) error {
+	path := restishengine.TokenCachePath(selection.ConfigDir)
 	if path == "" {
 		return nil
 	}

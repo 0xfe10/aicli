@@ -5,10 +5,10 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/0xfe10/aicli/internal/authflow"
+	"github.com/0xfe10/aicli/internal/contextflow"
 	"github.com/0xfe10/aicli/internal/restishengine"
 	restish "github.com/rest-sh/restish/v2"
 	restishconfig "github.com/rest-sh/restish/v2/config"
@@ -45,7 +45,12 @@ type Session struct {
 
 // LoadSession reads Base URL and credentials once for this CLI process.
 func LoadSession(version string) (Session, Config, error) {
-	session, file, env, err := loadSessionSnapshot()
+	return LoadSessionWithContext(version, contextManager.DefaultSelection())
+}
+
+// LoadSessionWithContext reads one selected account context.
+func LoadSessionWithContext(version string, selection contextflow.Selection) (Session, Config, error) {
+	session, file, env, err := loadSessionSnapshotWithContext(selection)
 	if err != nil {
 		return Session{}, Config{}, err
 	}
@@ -57,7 +62,11 @@ func LoadSession(version string) (Session, Config, error) {
 }
 
 func loadSessionSnapshot() (Session, FileConfig, environmentSnapshot, error) {
-	path := ConfigPath()
+	return loadSessionSnapshotWithContext(contextManager.DefaultSelection())
+}
+
+func loadSessionSnapshotWithContext(selection contextflow.Selection) (Session, FileConfig, environmentSnapshot, error) {
+	path := ConfigPathFor(selection)
 	var file FileConfig
 	if path != "" {
 		loaded, err := LoadFileConfig(path)
@@ -107,10 +116,15 @@ func configFromSnapshot(session Session, file FileConfig, env environmentSnapsho
 
 // NewCLIWithSession binds Base URL and credentials for the lifetime of the CLI.
 func NewCLIWithSession(cfg Config, session Session, version, commit string) *restish.CLI {
+	return NewCLIWithContext(cfg, session, version, commit, contextManager.DefaultSelection())
+}
+
+// NewCLIWithContext binds a selected account context to the CLI lifetime.
+func NewCLIWithContext(cfg Config, session Session, version, commit string, selection contextflow.Selection) *restish.CLI {
 	if session.BaseURL == "" {
 		session.BaseURL = cfg.BaseURL
 	}
-	configureStatePaths()
+	configureStatePathsFor(selection)
 	if cfg.Client == "" {
 		cfg.Client = DefaultClient
 	}
@@ -125,7 +139,7 @@ func NewCLIWithSession(cfg Config, session Session, version, commit string) *res
 	cli.SetCommandName("fns")
 	cli.SetCommandDescription(
 		"Fast Note Sync CLI",
-		"CLI generated from the FNS OpenAPI description.\n\nLocal commands:\n  auth login|status|logout   manage Base URL and credentials\n\nConfiguration:\n  --rsh-config is ignored; use fns auth or FNS_* environment variables.\n",
+		"CLI generated from the FNS OpenAPI description.\n\nLocal commands:\n  auth login|status|logout   manage Base URL and credentials\n  context current|list|use  select an account context\n\nConfiguration:\n  --context selects an account for one invocation.\n  --rsh-config is ignored; use fns auth or FNS_* environment variables.\n",
 	)
 	cli.SetVersion(formatVersion(version, commit))
 	cli.SetDefaultConfig(&restish.Config{APIs: map[string]*restish.APIConfig{
@@ -158,10 +172,15 @@ func NewCLIWithSession(cfg Config, session Session, version, commit string) *res
 
 // RunCLI executes Restish after stripping Restish config overrides.
 func RunCLI(cli *restish.CLI, args []string) error {
+	return RunCLIWithContext(cli, args, contextManager.DefaultSelection())
+}
+
+// RunCLIWithContext executes Restish with context-isolated state.
+func RunCLIWithContext(cli *restish.CLI, args []string, selection contextflow.Selection) error {
 	if cli == nil {
 		return fmt.Errorf("Restish CLI is required")
 	}
-	restore, err := restishengine.Isolate(cli, ConfigDir())
+	restore, err := restishengine.Isolate(cli, selection.ConfigDir)
 	if err != nil {
 		return fmt.Errorf("initialize isolated Restish runtime: %w", err)
 	}
@@ -179,22 +198,17 @@ func RunCLI(cli *restish.CLI, args []string) error {
 }
 
 func configureStatePaths() {
-	if os.Getenv("RSH_CACHE_DIR") == "" {
-		if dir := appStateDir("XDG_CACHE_HOME", ".cache"); dir != "" {
-			_ = os.Setenv("RSH_CACHE_DIR", filepath.Join(dir, "aicli", "fns"))
-		}
-	}
+	configureStatePathsFor(contextManager.DefaultSelection())
 }
 
-func appStateDir(envName, homeSuffix string) string {
-	if dir := strings.TrimSpace(os.Getenv(envName)); dir != "" && filepath.IsAbs(dir) {
-		return dir
+func configureStatePathsFor(selection contextflow.Selection) {
+	if selection.Name != contextflow.DefaultName && selection.CacheDir != "" {
+		_ = os.Setenv("RSH_CACHE_DIR", selection.CacheDir)
+	} else if os.Getenv("RSH_CACHE_DIR") == "" {
+		if selection.CacheDir != "" {
+			_ = os.Setenv("RSH_CACHE_DIR", selection.CacheDir)
+		}
 	}
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return ""
-	}
-	return filepath.Join(home, homeSuffix)
 }
 
 func validateHTTPURL(name, raw string) error {

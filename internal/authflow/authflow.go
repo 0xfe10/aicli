@@ -226,6 +226,8 @@ func normalizePort(u *url.URL) string {
 type StatusReport struct {
 	Configured       bool   `json:"configured"`
 	Mode             string `json:"mode,omitempty"`
+	Context          string `json:"context,omitempty"`
+	ContextSource    string `json:"contextSource,omitempty"`
 	BaseURL          string `json:"baseUrl,omitempty"`
 	BaseURLSource    string `json:"baseUrlSource,omitempty"`
 	CredentialSource string `json:"credentialSource,omitempty"`

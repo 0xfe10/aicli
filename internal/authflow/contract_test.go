@@ -15,6 +15,8 @@ func TestStatusReportContractKeys(t *testing.T) {
 	report := authflow.StatusReport{
 		Configured:       true,
 		Mode:             "token",
+		Context:          "default",
+		ContextSource:    "default",
 		BaseURL:          "https://example.test",
 		BaseURLSource:    authflow.SourceConfig,
 		CredentialSource: authflow.SourceConfig,
@@ -28,7 +30,7 @@ func TestStatusReportContractKeys(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &raw); err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"configured", "mode", "baseUrl", "baseUrlSource", "credentialSource", "configPath"} {
+	for _, key := range []string{"configured", "mode", "context", "contextSource", "baseUrl", "baseUrlSource", "credentialSource", "configPath"} {
 		if _, ok := raw[key]; !ok {
 			t.Fatalf("missing status key %q in %s", key, buf.String())
 		}
