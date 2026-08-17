@@ -100,6 +100,95 @@ func TestSafetyPolicyPrimesFromLegacyRawSpecCache(t *testing.T) {
 	}
 }
 
+func TestSafetyPolicyRejectsSymlinkedSpecCache(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions vary on Windows")
+	}
+	for _, symlinkFile := range []bool{false, true} {
+		name := "directory"
+		if symlinkFile {
+			name = "file"
+		}
+		t.Run(name, func(t *testing.T) {
+			cacheDir := t.TempDir()
+			configPath := filepath.Join(t.TempDir(), "restish.json")
+			cachePath := specCachePath(cacheDir, configPath, "ozon")
+			if symlinkFile {
+				if err := os.MkdirAll(filepath.Dir(cachePath), 0o700); err != nil {
+					t.Fatal(err)
+				}
+				target := filepath.Join(t.TempDir(), "ozon.cbor")
+				if err := os.WriteFile(target, []byte("untrusted"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(target, cachePath); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				configsDir := filepath.Join(cacheDir, "specs", "configs")
+				if err := os.MkdirAll(filepath.Dir(configsDir), 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(t.TempDir(), configsDir); err != nil {
+					t.Fatal(err)
+				}
+			}
+			policy := &SafetyPolicy{}
+			policy.PrimeFromSpecCache(cacheDir, configPath, "ozon")
+			if policy.Ready() {
+				t.Fatal("policy loaded from symlinked cache")
+			}
+		})
+	}
+}
+
+func TestSafetyPolicyRejectsWritableSpecCache(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX permissions are unavailable")
+	}
+	cacheDir := t.TempDir()
+	configPath := filepath.Join(t.TempDir(), "restish.json")
+	cachePath := specCachePath(cacheDir, configPath, "ozon")
+	if err := os.MkdirAll(filepath.Dir(cachePath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cachePath, []byte("untrusted"), 0o666); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(cachePath, 0o666); err != nil {
+		t.Fatal(err)
+	}
+	policy := &SafetyPolicy{}
+	policy.PrimeFromSpecCache(cacheDir, configPath, "ozon")
+	if policy.Ready() {
+		t.Fatal("policy loaded from group- or other-writable cache")
+	}
+}
+
+func TestRunCLIRejectsSymlinkedPrimarySpecCache(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink permissions vary on Windows")
+	}
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	manager := ContextManager()
+	selection, _, err := manager.ResolveArgs([]string{"ozon", "--context", "seller-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.Prepare(selection); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(t.TempDir(), filepath.Join(selection.CacheDir, "specs")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("RSH_CACHE_DIR", selection.CacheDir)
+	err = RunCLIWithContext(restish.New(), []string{"ozon", "--help"}, selection)
+	if err == nil || !strings.Contains(err.Error(), "validate Ozon spec cache") {
+		t.Fatalf("RunCLIWithContext error = %v", err)
+	}
+}
+
 func TestSafetyOverridesAmbiguousPOSTRoutes(t *testing.T) {
 	checks := map[string]string{
 		"/v2/chat/read":                      "write",
@@ -165,14 +254,19 @@ func TestGeneratedReadCommandUsesSafetyPolicyWithOperationCache(t *testing.T) {
 		configRoot = linkedRoot
 	}
 	t.Setenv("XDG_CONFIG_HOME", configRoot)
-	t.Setenv("RSH_CACHE_DIR", filepath.Join(t.TempDir(), "cache"))
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("RSH_CACHE_DIR", "")
+	selection, _, err := ContextManager().ResolveArgs([]string{"ozon", "--context", "seller-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	session := Session{BaseURL: server.URL, HasCredentials: true, Credentials: Credentials{ClientID: "client", APIKey: "secret"}}
 	cfg := Config{BaseURL: server.URL, SpecURL: server.URL + "/openapi.json"}
 	run := func() error {
-		cli := NewCLIWithSession(cfg, session, "test", "")
+		cli := NewCLIWithContext(cfg, session, "test", "", selection)
 		cli.Stdin = strings.NewReader(`{}`)
 		cli.Stdout, cli.Stderr = &bytes.Buffer{}, &bytes.Buffer{}
-		return RunCLI(cli, []string{"ozon", "product-api", "get-product-list", "-o", "json"})
+		return RunCLIWithContext(cli, []string{"ozon", "product-api", "get-product-list", "-o", "json"}, selection)
 	}
 	if err := run(); err != nil {
 		t.Fatalf("first run: %v", err)
@@ -185,6 +279,9 @@ func TestGeneratedReadCommandUsesSafetyPolicyWithOperationCache(t *testing.T) {
 	}
 	if apiHits != 2 {
 		t.Fatalf("api hits = %d, want 2", apiHits)
+	}
+	if got := os.Getenv("RSH_CACHE_DIR"); got != selection.CacheDir {
+		t.Fatalf("RSH_CACHE_DIR = %q, want selected context cache %q", got, selection.CacheDir)
 	}
 }
 

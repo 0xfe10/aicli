@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/0xfe10/aicli/internal/contextflow"
 	"github.com/0xfe10/aicli/internal/ozonrt"
 )
 
@@ -13,20 +14,37 @@ var (
 )
 
 func main() {
-	if handled, err := ozonrt.MaybeRunAuth(os.Args); handled {
+	manager := ozonrt.ContextManager()
+	selection, args, err := manager.ResolveArgs(os.Args)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, ozonrt.RedactSecrets(err.Error()))
+		os.Exit(1)
+	}
+	if handled, err := contextflow.MaybeRun(args, manager, selection, os.Stdout, os.Stderr); handled {
 		if err != nil {
 			fmt.Fprintln(os.Stderr, ozonrt.RedactSecrets(err.Error()))
 			os.Exit(1)
 		}
 		return
 	}
-	session, cfg, err := ozonrt.LoadSession()
+	if err := manager.Prepare(selection); err != nil {
+		fmt.Fprintln(os.Stderr, ozonrt.RedactSecrets(err.Error()))
+		os.Exit(1)
+	}
+	if handled, err := ozonrt.MaybeRunAuthWithContext(args, selection); handled {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, ozonrt.RedactSecrets(err.Error()))
+			os.Exit(1)
+		}
+		return
+	}
+	session, cfg, err := ozonrt.LoadSessionWithContext(selection)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, ozonrt.RedactSecrets(err.Error()))
 		os.Exit(1)
 	}
-	cli := ozonrt.NewCLIWithSession(cfg, session, version, commit)
-	if err := ozonrt.RunCLI(cli, os.Args); err != nil {
+	cli := ozonrt.NewCLIWithContext(cfg, session, version, commit, selection)
+	if err := ozonrt.RunCLIWithContext(cli, args, selection); err != nil {
 		fmt.Fprintln(os.Stderr, ozonrt.RedactSecrets(err.Error()))
 		os.Exit(1)
 	}

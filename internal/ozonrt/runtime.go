@@ -5,10 +5,10 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/0xfe10/aicli/internal/authflow"
+	"github.com/0xfe10/aicli/internal/contextflow"
 	"github.com/0xfe10/aicli/internal/restishengine"
 	restish "github.com/rest-sh/restish/v2"
 	restishconfig "github.com/rest-sh/restish/v2/config"
@@ -34,7 +34,12 @@ type Session struct {
 }
 
 func LoadSession() (Session, Config, error) {
-	file, err := LoadFileConfig(ConfigPath())
+	return LoadSessionWithContext(contextManager.DefaultSelection())
+}
+
+// LoadSessionWithContext reads one selected account context.
+func LoadSessionWithContext(selection contextflow.Selection) (Session, Config, error) {
+	file, err := LoadFileConfig(ConfigPathFor(selection))
 	if err != nil {
 		return Session{}, Config{}, err
 	}
@@ -62,13 +67,18 @@ func LoadSession() (Session, Config, error) {
 }
 
 func NewCLIWithSession(cfg Config, session Session, version, commit string) *restish.CLI {
-	configureStatePaths()
+	return NewCLIWithContext(cfg, session, version, commit, contextManager.DefaultSelection())
+}
+
+// NewCLIWithContext binds a selected account context to the CLI lifetime.
+func NewCLIWithContext(cfg Config, session Session, version, commit string, selection contextflow.Selection) *restish.CLI {
+	configureStatePathsFor(selection)
 	policy := &SafetyPolicy{}
 	cli := restish.New()
 	cli.SetCommandName("ozon")
 	cli.SetCommandDescription(
 		"Ozon Seller API CLI",
-		"CLI generated from the complete Ozon Seller OpenAPI description.\n\nLocal commands:\n  auth login|status|logout   manage Client-Id and Api-Key\n\nConfiguration:\n  --rsh-config is ignored; use ozon auth or OZON_* environment variables.\n",
+		"CLI generated from the complete Ozon Seller OpenAPI description.\n\nLocal commands:\n  auth login|status|logout   manage Client-Id and Api-Key\n  context current|list|use  select an account context\n\nConfiguration:\n  --context selects an account for one invocation.\n  --rsh-config is ignored; use ozon auth or OZON_* environment variables.\n",
 	)
 	cli.SetVersion(formatVersion(version, commit))
 	cli.SetDefaultConfig(&restish.Config{APIs: map[string]*restish.APIConfig{
@@ -85,15 +95,30 @@ func NewCLIWithSession(cfg Config, session Session, version, commit string) *res
 	}})
 	cli.SetCommandSurface(restish.CommandSurface{PromotedAPI: "ozon", SupportCommandNamespace: "cli"})
 	cli.AddLoader(SpecLoader{Policy: policy})
-	cli.AddAuthHandler(AuthType, &HeaderAuth{Session: session, Policy: policy})
+	cli.AddAuthHandler(AuthType, &HeaderAuth{Session: session, Policy: policy, StateDir: selection.ConfigDir})
 	return cli
 }
 
 func RunCLI(cli *restish.CLI, args []string) error {
+	return RunCLIWithContext(cli, args, contextManager.DefaultSelection())
+}
+
+// RunCLIWithContext executes Restish with context-isolated state.
+func RunCLIWithContext(cli *restish.CLI, args []string, selection contextflow.Selection) error {
 	if cli == nil {
 		return fmt.Errorf("Restish CLI is required")
 	}
-	restore, err := restishengine.Isolate(cli, ConfigDir())
+	cacheDir := os.Getenv("RSH_CACHE_DIR")
+	if cacheDir != "" {
+		if err := os.MkdirAll(cacheDir, 0o700); err != nil {
+			return fmt.Errorf("initialize Ozon cache: %w", err)
+		}
+		cachePath := specCachePath(cacheDir, restishengine.ConfigPath(selection.ConfigDir), "ozon")
+		if _, err := validateSecureCacheFilePath(cacheDir, cachePath); err != nil {
+			return fmt.Errorf("validate Ozon spec cache: %w", err)
+		}
+	}
+	restore, err := restishengine.Isolate(cli, selection.ConfigDir)
 	if err != nil {
 		return fmt.Errorf("initialize isolated Restish runtime: %w", err)
 	}
@@ -111,22 +136,17 @@ func RunCLI(cli *restish.CLI, args []string) error {
 }
 
 func configureStatePaths() {
-	if os.Getenv("RSH_CACHE_DIR") == "" {
-		if dir := appStateDir("XDG_CACHE_HOME", ".cache"); dir != "" {
-			_ = os.Setenv("RSH_CACHE_DIR", filepath.Join(dir, "aicli", "ozon"))
-		}
-	}
+	configureStatePathsFor(contextManager.DefaultSelection())
 }
 
-func appStateDir(envName, homeSuffix string) string {
-	if dir := strings.TrimSpace(os.Getenv(envName)); dir != "" && filepath.IsAbs(dir) {
-		return dir
+func configureStatePathsFor(selection contextflow.Selection) {
+	if selection.Name != contextflow.DefaultName && selection.CacheDir != "" {
+		_ = os.Setenv("RSH_CACHE_DIR", selection.CacheDir)
+	} else if os.Getenv("RSH_CACHE_DIR") == "" {
+		if selection.CacheDir != "" {
+			_ = os.Setenv("RSH_CACHE_DIR", selection.CacheDir)
+		}
 	}
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return ""
-	}
-	return filepath.Join(home, homeSuffix)
 }
 
 func validateHTTPURL(name, raw string) error {

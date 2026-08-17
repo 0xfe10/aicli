@@ -8,8 +8,14 @@ import (
 	"strings"
 
 	"github.com/0xfe10/aicli/internal/authflow"
+	"github.com/0xfe10/aicli/internal/contextflow"
 	toml "github.com/pelletier/go-toml/v2"
 )
+
+var contextManager = contextflow.New("pingcode", "PINGCODE_CONTEXT")
+
+// ContextManager returns PingCode's account-context manager.
+func ContextManager() contextflow.Manager { return contextManager }
 
 const (
 	AuthModeClient = "client"
@@ -37,15 +43,17 @@ type FileConfig struct {
 
 // ConfigDir returns $XDG_CONFIG_HOME/aicli/pingcode or ~/.config/aicli/pingcode.
 func ConfigDir() string {
-	if dir := appStateDir("XDG_CONFIG_HOME", ".config"); dir != "" {
-		return filepath.Join(dir, "aicli", "pingcode")
-	}
-	return ""
+	return contextManager.DefaultSelection().ConfigDir
 }
 
 // ConfigPath returns the absolute path of config.toml.
 func ConfigPath() string {
-	dir := ConfigDir()
+	return ConfigPathFor(contextManager.DefaultSelection())
+}
+
+// ConfigPathFor returns the config path for selection.
+func ConfigPathFor(selection contextflow.Selection) string {
+	dir := selection.ConfigDir
 	if dir == "" {
 		return ""
 	}

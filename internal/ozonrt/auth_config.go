@@ -8,8 +8,14 @@ import (
 	"strings"
 
 	"github.com/0xfe10/aicli/internal/authflow"
+	"github.com/0xfe10/aicli/internal/contextflow"
 	toml "github.com/pelletier/go-toml/v2"
 )
+
+var contextManager = contextflow.New("ozon", "OZON_CONTEXT")
+
+// ContextManager returns Ozon's account-context manager.
+func ContextManager() contextflow.Manager { return contextManager }
 
 const (
 	AuthModeKey   = "key"
@@ -30,14 +36,16 @@ type FileConfig struct {
 }
 
 func ConfigDir() string {
-	if dir := appStateDir("XDG_CONFIG_HOME", ".config"); dir != "" {
-		return filepath.Join(dir, "aicli", "ozon")
-	}
-	return ""
+	return contextManager.DefaultSelection().ConfigDir
 }
 
 func ConfigPath() string {
-	if dir := ConfigDir(); dir != "" {
+	return ConfigPathFor(contextManager.DefaultSelection())
+}
+
+// ConfigPathFor returns the config path for selection.
+func ConfigPathFor(selection contextflow.Selection) string {
+	if dir := selection.ConfigDir; dir != "" {
 		return filepath.Join(dir, configFile)
 	}
 	return ""

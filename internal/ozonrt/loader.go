@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -302,7 +303,7 @@ func (p *SafetyPolicy) PrimeFromSpecCache(cacheDir, configPath, apiName string) 
 	if p == nil || cacheDir == "" || configPath == "" || apiName == "" {
 		return
 	}
-	data, err := os.ReadFile(specCachePath(cacheDir, configPath, apiName))
+	data, err := readSecureCacheFile(cacheDir, specCachePath(cacheDir, configPath, apiName))
 	if err != nil {
 		return
 	}
@@ -317,6 +318,63 @@ func (p *SafetyPolicy) PrimeFromSpecCache(cacheDir, configPath, apiName string) 
 	if _, routes, err := fixSpec(raw); err == nil {
 		p.Replace(routes)
 	}
+}
+
+func readSecureCacheFile(cacheDir, path string) ([]byte, error) {
+	exists, err := validateSecureCacheFilePath(cacheDir, path)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, os.ErrNotExist
+	}
+	return os.ReadFile(path)
+}
+
+func validateSecureCacheFilePath(cacheDir, path string) (bool, error) {
+	cacheDir = filepath.Clean(cacheDir)
+	dir := filepath.Dir(filepath.Clean(path))
+	rel, err := filepath.Rel(cacheDir, dir)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return false, fmt.Errorf("cache file is outside its cache directory")
+	}
+	current := cacheDir
+	parts := []string{}
+	if rel != "." {
+		parts = strings.Split(rel, string(filepath.Separator))
+	}
+	for _, part := range append([]string{""}, parts...) {
+		if part != "" {
+			current = filepath.Join(current, part)
+		}
+		info, err := os.Lstat(current)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			return false, fmt.Errorf("cache path must be a directory, not a symlink: %s", current)
+		}
+		if runtime.GOOS != "windows" && info.Mode().Perm()&0o022 != 0 {
+			return false, fmt.Errorf("cache directory must not be group- or other-writable: %s", current)
+		}
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return false, fmt.Errorf("cache entry must be a regular file, not a symlink: %s", path)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o022 != 0 {
+		return false, fmt.Errorf("cache entry must not be group- or other-writable: %s", path)
+	}
+	return true, nil
 }
 
 func specCachePath(cacheDir, configPath, apiName string) string {
