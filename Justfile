@@ -81,12 +81,12 @@ compliance-check:
       echo
       for pkg in ./cmd/aicli ./cmd/pingcode ./cmd/fns ./cmd/ozon ./cmd/lanhu; do
         echo "## $pkg"
-        go list -deps -json "$pkg" | jq -r 'select((.Standard|not) and .Module != null) | [.Module.Path, .Module.Version] | @tsv' | sort -u
+        go list -deps -json "$pkg" | jq -r 'select((.Standard|not) and .Module != null and (.Module.Main|not)) | [.Module.Path, .Module.Version] | @tsv' | sort -u
         echo
       done
       echo "## union"
       for pkg in ./cmd/aicli ./cmd/pingcode ./cmd/fns ./cmd/ozon ./cmd/lanhu; do
-        go list -deps -json "$pkg" | jq -r 'select((.Standard|not) and .Module != null) | [.Module.Path, .Module.Version] | @tsv'
+        go list -deps -json "$pkg" | jq -r 'select((.Standard|not) and .Module != null and (.Module.Main|not)) | [.Module.Path, .Module.Version] | @tsv'
       done | sort -u
     } > openwiki/compliance/modules-linked.txt
     go mod verify | tee openwiki/compliance/go-mod-verify.txt

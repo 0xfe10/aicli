@@ -29,6 +29,16 @@ func MaybeRunWorkflow(args []string, session Session, stdout io.Writer) (bool, e
 		_, err := fmt.Fprintf(stdout, "Usage: %s\n", usage[args[1]])
 		return true, err
 	}
+	if args[0] == "axure" && args[1] == "render" {
+		if len(args) != 5 {
+			return true, fmt.Errorf("usage: lanhu axure render <download-dir> <page.html> <output.png>")
+		}
+		if err := Render(context.Background(), args[2], args[3], args[4]); err != nil {
+			return true, err
+		}
+		_, err := fmt.Fprintf(stdout, "%s\n", args[4])
+		return true, err
+	}
 	if !session.HasCredentials {
 		return true, fmt.Errorf("Lanhu authentication is not configured; run %q or set LANHU_COOKIE", "lanhu auth login --mode cookie")
 	}
@@ -59,15 +69,6 @@ func MaybeRunWorkflow(args []string, session Session, stdout io.Writer) (bool, e
 			return true, err
 		}
 		_, err = fmt.Fprintf(stdout, "%s\n", args[3])
-		return true, err
-	case "render":
-		if len(args) != 5 {
-			return true, fmt.Errorf("usage: lanhu axure render <download-dir> <page.html> <output.png>")
-		}
-		if err := Render(ctx, args[2], args[3], args[4]); err != nil {
-			return true, err
-		}
-		_, err := fmt.Fprintf(stdout, "%s\n", args[4])
 		return true, err
 	default:
 		return true, fmt.Errorf("unknown axure command %q", args[1])

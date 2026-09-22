@@ -5,10 +5,12 @@ Generated for the union of release binary dependency closures:
 - `./cmd/aicli`
 - `./cmd/pingcode`
 - `./cmd/fns`
+- `./cmd/ozon`
+- `./cmd/lanhu`
 
 Evidence source: `just compliance-check` → [`modules-linked.txt`](modules-linked.txt).
 
-- Module count (union, excluding the main module): 60
+- Module count (union, excluding the main module): 69
 - Unknown/unreadable: 0
 - GPL detected: 0
 - Method: `go list -deps -json` + LICENSE file scan in module cache.
@@ -29,6 +31,9 @@ Evidence source: `just compliance-check` → [`modules-linked.txt`](modules-link
 | `github.com/charmbracelet/x/cellbuf` | `v0.0.13` | MIT | LICENSE | no |
 | `github.com/charmbracelet/x/exp/slice` | `v0.0.0-20250327172914-2fdc97757edf` | MIT | LICENSE | no |
 | `github.com/charmbracelet/x/term` | `v0.2.1` | MIT | LICENSE | no |
+| `github.com/chromedp/cdproto` | `v0.0.0-20250724212937-08a3db8b4327` | MIT | LICENSE | no |
+| `github.com/chromedp/chromedp` | `v0.14.2` | MIT | LICENSE | no |
+| `github.com/chromedp/sysutil` | `v1.1.0` | MIT | LICENSE | no |
 | `github.com/clipperhouse/uax29/v2` | `v2.7.0` | MIT | LICENSE | no |
 | `github.com/danielgtaylor/huma/v2` | `v2.37.3` | MIT | LICENSE.md | no |
 | `github.com/danielgtaylor/mexpr` | `v1.10.1` | MIT | LICENSE | no |
@@ -36,8 +41,12 @@ Evidence source: `just compliance-check` → [`modules-linked.txt`](modules-link
 | `github.com/dlclark/regexp2` | `v1.11.5` | MIT | LICENSE | no |
 | `github.com/fxamacker/cbor/v2` | `v2.9.1` | MIT | LICENSE | no |
 | `github.com/getkin/kin-openapi` | `v0.145.0` | MIT | LICENSE | no |
+| `github.com/go-json-experiment/json` | `v0.0.0-20250725192818-e39067aee2d2` | BSD-3-Clause | LICENSE | no |
 | `github.com/go-openapi/jsonpointer` | `v0.22.5` | Apache-2.0 | LICENSE | no (no NOTICE file in module) |
 | `github.com/go-openapi/swag/jsonname` | `v0.25.5` | Apache-2.0 | LICENSE | no (no NOTICE file in module) |
+| `github.com/gobwas/httphead` | `v0.1.0` | MIT | LICENSE | no |
+| `github.com/gobwas/pool` | `v0.2.1` | MIT | LICENSE | no |
+| `github.com/gobwas/ws` | `v1.4.0` | MIT | LICENSE | no |
 | `github.com/google/shlex` | `v0.0.0-20191202100458-e7afc7fbc510` | Apache-2.0 | COPYING | yes |
 | `github.com/gorilla/css` | `v1.0.1` | BSD-3-Clause | LICENSE | no |
 | `github.com/hexops/gotextdiff` | `v1.0.3` | BSD-3-Clause | LICENSE | no |
@@ -54,6 +63,7 @@ Evidence source: `just compliance-check` → [`modules-linked.txt`](modules-link
 | `github.com/pb33f/jsonpath` | `v0.8.2` | Apache-2.0 | LICENSE | yes |
 | `github.com/pb33f/libopenapi` | `v0.35.0` | MIT | LICENSE | no |
 | `github.com/pb33f/ordered-map/v2` | `v2.3.1` | Apache-2.0 | LICENSE | yes |
+| `github.com/pelletier/go-toml/v2` | `v2.4.3` | MIT | LICENSE | no |
 | `github.com/rest-sh/restish/v2` | `v2.3.0` | MIT | LICENSE.md | no |
 | `github.com/rivo/uniseg` | `v0.4.7` | MIT | LICENSE.txt | no |
 | `github.com/sandrolain/httpcache` | `v1.4.0` | MIT | LICENSE.txt | no |
@@ -67,7 +77,7 @@ Evidence source: `just compliance-check` → [`modules-linked.txt`](modules-link
 | `github.com/xo/terminfo` | `v0.0.0-20220910002029-abceb7e1c41e` | MIT | LICENSE | no |
 | `github.com/yuin/goldmark-emoji` | `v1.0.6` | MIT | LICENSE | no |
 | `github.com/yuin/goldmark` | `v1.7.17` | MIT | LICENSE | no |
-| `golang.org/x/net` | `v0.55.0` | BSD-3-Clause | LICENSE | no |
+| `golang.org/x/net` | `v0.57.0` | BSD-3-Clause | LICENSE | no |
 | `golang.org/x/sync` | `v0.21.0` | BSD-3-Clause | LICENSE | no |
 | `golang.org/x/sys` | `v0.45.0` | BSD-3-Clause | LICENSE | no |
 | `golang.org/x/term` | `v0.43.0` | BSD-3-Clause | LICENSE | no |
@@ -107,6 +117,8 @@ See [`govulncheck.txt`](govulncheck.txt).
   GO-2026-4740 and GO-2026-4513 (`Fixed in: N/A`; reachable through the embedded
   Restish runtime used by `pingcode` and `fns`).
 - No new vulnerabilities were introduced by the FNS / kin-openapi dependency set
+  in this scan.
+- No new vulnerabilities were introduced by the Lanhu / chromedp dependency set
   in this scan.
 
 ## go mod verify

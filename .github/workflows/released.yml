@@ -89,6 +89,7 @@ jobs:
           - pingcode
           - fns
           - ozon
+          - lanhu
         goos:
           - linux
           - darwin

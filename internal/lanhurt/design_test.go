@@ -45,7 +45,7 @@ func TestDesignOverviewInspectAndExport(t *testing.T) {
 			if req.Header.Get("Cookie") != "" {
 				t.Fatal("cookie leaked to signed JSON host")
 			}
-			body = []byte(`{"layers":[{"id":"node","name":"Button","frame":{"x":2,"y":2,"width":5,"height":4},"image_url":"https://lanhu.oss-cn-beijing.aliyuncs.com/asset.png"}]}`)
+			body = []byte(`{"info":[{"do_objectID":"node","name":"Button","frame":{"x":2,"y":2,"width":5,"height":4},"exportable":true,"image":{"imageUrl":"https://lanhu.oss-cn-beijing.aliyuncs.com/asset.png"}}]}`)
 		case "lanhu.oss-cn-beijing.aliyuncs.com/reference.png", "lanhu.oss-cn-beijing.aliyuncs.com/asset.png":
 			body = imageBytes
 		case "dds.lanhuapp.com/api/dds/image/store_schema_revise":
@@ -89,6 +89,98 @@ func TestDesignOverviewInspectAndExport(t *testing.T) {
 	}
 	if strings.Join(names, ",") != "assets/001-"+design.Assets[0].ID+".png,manifest.json" {
 		t.Fatalf("zip entries=%v", names)
+	}
+}
+
+func TestLoadDesignRejectsMismatchedID(t *testing.T) {
+	transport := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		body := `{"code":"00000","result":{"id":"other"}}`
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(body)), Request: req}, nil
+	})
+	client := Client{HTTP: &http.Client{Transport: transport}}
+	_, err := client.LoadDesign(context.Background(), "https://lanhuapp.com/web/#/item/project/detail?pid=project&image_id=design")
+	if err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("mismatched design accepted: %v", err)
+	}
+}
+
+func TestNormalizeObservedSourceCoordinatesAndExportFlags(t *testing.T) {
+	assetURL := "https://lanhu.oss-cn-beijing.aliyuncs.com/asset.png"
+	fixtures := []struct {
+		name, source string
+		raw          map[string]any
+	}{
+		{"figma", "figma", map[string]any{"artboard": map[string]any{"id": "canvas", "frame": map[string]any{"left": 0.0, "top": 0.0, "width": 100.0, "height": 100.0}, "children": []any{map[string]any{"id": "node", "frame": map[string]any{"left": 12.0, "top": 23.0, "width": 30.0, "height": 40.0}, "hasExportImage": true, "image": map[string]any{"imageUrl": assetURL}}, map[string]any{"id": "preview", "frame": map[string]any{"left": 1.0, "top": 1.0, "width": 2.0, "height": 2.0}, "image": map[string]any{"imageUrl": assetURL + "?preview=1"}}}}}},
+		{"sketch", "sketch", map[string]any{"info": []any{map[string]any{"do_objectID": "node", "frame": map[string]any{"x": 12.0, "y": 23.0, "width": 30.0, "height": 40.0}, "exportable": true, "image": assetURL}}}},
+		{"photoshop", "photoshop", map[string]any{"type": "ps", "board": map[string]any{"id": "canvas", "children": []any{map[string]any{"id": "node", "left": 12.0, "top": 23.0, "right": 42.0, "bottom": 63.0, "isSlice": true, "images": map[string]any{"png": assetURL}}}}}},
+	}
+	for _, fixture := range fixtures {
+		t.Run(fixture.name, func(t *testing.T) {
+			nodes, assets, source := normalizeDesign(fixture.raw)
+			if source != fixture.source || len(assets) != 1 {
+				t.Fatalf("source=%s assets=%+v", source, assets)
+			}
+			var found *Rect
+			for _, node := range nodes {
+				if node.ID == "node" {
+					found = node.Bounds
+				}
+			}
+			if found == nil || found.X != 12 || found.Y != 23 || found.Width != 30 || found.Height != 40 {
+				t.Fatalf("node bounds=%+v nodes=%+v", found, nodes)
+			}
+		})
+	}
+}
+
+func TestResolveCanvasRejectsUnverifiedCoordinates(t *testing.T) {
+	for _, fixture := range []struct {
+		name, source string
+		raw          map[string]any
+	}{
+		{"figma", "figma", map[string]any{"artboard": map[string]any{"frame": map[string]any{"left": 1000.0, "top": 2000.0, "width": 100.0, "height": 50.0}}}},
+		{"photoshop", "photoshop", map[string]any{"board": map[string]any{"left": 1000.0, "top": 2000.0, "right": 1100.0, "bottom": 2050.0}}},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			if _, err := resolveCanvas(fixture.raw, fixture.source, 100, 50, image.Pt(200, 100)); err == nil || !strings.Contains(err.Error(), "non-zero origin") {
+				t.Fatalf("non-zero canvas accepted: %v", err)
+			}
+		})
+	}
+	if _, err := resolveCanvas(map[string]any{}, "sketch", 100, 100, image.Pt(200, 100)); err == nil || !strings.Contains(err.Error(), "aspect ratios") {
+		t.Fatalf("mismatched reference accepted: %v", err)
+	}
+}
+
+func TestExportRejectsHTMLAndBoundsTotalBytes(t *testing.T) {
+	transport := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"text/html"}}, Body: io.NopCloser(strings.NewReader("<html>expired</html>")), Request: req}, nil
+	})
+	client := Client{HTTP: &http.Client{Transport: transport}}
+	design := Design{ID: "d", VersionID: "v", Assets: []DesignAsset{{ID: "a", URL: "https://lanhu.oss-cn-beijing.aliyuncs.com/asset.png", Kind: "exported_asset"}}}
+	result, err := client.ExportDesign(context.Background(), design, filepath.Join(t.TempDir(), "assets.zip"))
+	if err != nil || result["succeeded"] != 0 || result["failed"] != 1 {
+		t.Fatalf("result=%v err=%v", result, err)
+	}
+	if _, err := nextBundleTotal(maxBundleBytes-1, 2); err == nil {
+		t.Fatal("total bundle limit was not enforced")
+	}
+	for name, test := range map[string]struct {
+		data []byte
+		url  string
+	}{
+		"webp": {[]byte("RIFFxxxxWEBP"), "https://lanhuapp.com/a.webp"},
+		"avif": {[]byte("xxxxftypavifxxxx"), "https://lanhuapp.com/a.avif"},
+		"svg":  {[]byte("<svg"), "https://lanhuapp.com/a.svg"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, _, _, _, err := inspectAsset(test.data, test.url); err == nil {
+				t.Fatalf("truncated %s was accepted", name)
+			}
+		})
+	}
+	if extension, mediaType, _, _, err := inspectAsset([]byte(`<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>`), "https://lanhuapp.com/a.svg"); err != nil || extension != ".svg" || mediaType != "image/svg+xml" {
+		t.Fatalf("valid SVG extension=%q media=%q err=%v", extension, mediaType, err)
 	}
 }
 

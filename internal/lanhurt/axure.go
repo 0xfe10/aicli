@@ -1,11 +1,13 @@
 package lanhurt
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,6 +15,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/chromedp/chromedp"
+	"golang.org/x/net/html"
 )
 
 const (
@@ -133,7 +138,10 @@ func (c *Client) applyHeaders(req *http.Request) {
 	req.Header.Set("Accept", "application/json, text/plain, */*")
 	req.Header.Set("Referer", "https://lanhuapp.com/web/")
 	req.Header.Set("request-from", "web")
-	switch req.URL.Hostname() {
+	if !exactHTTPSOrigin(req.URL) {
+		return
+	}
+	switch strings.ToLower(req.URL.Hostname()) {
 	case "lanhuapp.com":
 		req.Header.Set("Cookie", c.Cookie)
 	case "dds.lanhuapp.com":
@@ -141,6 +149,14 @@ func (c *Client) applyHeaders(req *http.Request) {
 		req.Header.Set("Referer", "https://dds.lanhuapp.com/")
 		req.Header.Set("Authorization", "Basic dW5kZWZpbmVkOg==")
 	}
+}
+
+func exactHTTPSOrigin(value *url.URL) bool {
+	if value == nil || !strings.EqualFold(value.Scheme, "https") || value.Port() != "" {
+		return false
+	}
+	host := strings.ToLower(value.Hostname())
+	return host == "lanhuapp.com" || host == "dds.lanhuapp.com"
 }
 
 func allowedHost(host string) bool {
@@ -354,20 +370,96 @@ func (c *Client) Download(ctx context.Context, doc Document, output string) erro
 }
 
 func patchHTML(path string) error {
-	data, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return err
 	}
-	html := string(data)
-	html = strings.ReplaceAll(html, "data-src=", "src=")
-	for _, hidden := range []string{"display: none;", "display:none;", "opacity: 0;", "opacity:0;"} {
-		html = strings.ReplaceAll(html, hidden, "")
+	document, err := html.Parse(file)
+	file.Close()
+	if err != nil {
+		return err
 	}
-	shim := `<script>function lanhu_Axure_Mapping_Data(data){window.__lanhuAxurePageData=data;return data}</script>`
-	if strings.Contains(html, "</head>") {
-		html = strings.Replace(html, "</head>", shim+"</head>", 1)
+	var head *html.Node
+	var walk func(*html.Node)
+	walk = func(node *html.Node) {
+		if node.Type == html.ElementNode {
+			if node.Data == "head" {
+				head = node
+			}
+			source := ""
+			attributes := node.Attr[:0]
+			for _, attribute := range node.Attr {
+				if attribute.Key == "data-src" {
+					source = attribute.Val
+					continue
+				}
+				if node.Data == "body" && attribute.Key == "style" {
+					attribute.Val = visibleBodyStyle(attribute.Val)
+					if attribute.Val == "" {
+						continue
+					}
+				}
+				attributes = append(attributes, attribute)
+			}
+			node.Attr = attributes
+			if source != "" {
+				target := ""
+				switch node.Data {
+				case "img", "script":
+					target = "src"
+				case "link":
+					target = "href"
+				}
+				if target != "" {
+					node.Attr = setHTMLAttribute(node.Attr, target, source)
+				}
+			}
+		}
+		for child := node.FirstChild; child != nil; child = child.NextSibling {
+			walk(child)
+		}
 	}
-	return os.WriteFile(path, []byte(html), 0o644)
+	walk(document)
+	if head != nil {
+		script := &html.Node{Type: html.ElementNode, Data: "script"}
+		script.AppendChild(&html.Node{Type: html.TextNode, Data: "function lanhu_Axure_Mapping_Data(data){window.__lanhuAxurePageData=data;return data}"})
+		if head.FirstChild == nil {
+			head.AppendChild(script)
+		} else {
+			head.InsertBefore(script, head.FirstChild)
+		}
+	}
+	var output bytes.Buffer
+	if err := html.Render(&output, document); err != nil {
+		return err
+	}
+	return os.WriteFile(path, output.Bytes(), 0o644)
+}
+
+func visibleBodyStyle(value string) string {
+	kept := make([]string, 0)
+	for _, declaration := range strings.Split(value, ";") {
+		parts := strings.SplitN(declaration, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		property, setting := strings.ToLower(strings.TrimSpace(parts[0])), strings.ToLower(strings.TrimSpace(parts[1]))
+		if property == "display" && setting == "none" || property == "opacity" && setting == "0" {
+			continue
+		}
+		kept = append(kept, strings.TrimSpace(parts[0])+": "+strings.TrimSpace(parts[1]))
+	}
+	return strings.Join(kept, "; ")
+}
+
+func setHTMLAttribute(attributes []html.Attribute, key, value string) []html.Attribute {
+	for index := range attributes {
+		if attributes[index].Key == key {
+			attributes[index].Val = value
+			return attributes
+		}
+	}
+	return append(attributes, html.Attribute{Key: key, Val: value})
 }
 
 func (c *Client) downloadSigned(ctx context.Context, entry map[string]any, path string) error {
@@ -460,7 +552,18 @@ func Render(ctx context.Context, directory, page, output string) error {
 	if chromium == "" {
 		return errors.New("Chromium not found; install it or set LANHU_CHROMIUM")
 	}
-	absPage, err := filepath.Abs(filepath.Join(directory, filepath.FromSlash(page)))
+	absPage, err := safeJoin(directory, page)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(absPage)
+	if err != nil {
+		return fmt.Errorf("stat Axure page: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return errors.New("Axure page must be a regular file")
+	}
+	root, err := filepath.Abs(directory)
 	if err != nil {
 		return err
 	}
@@ -471,20 +574,36 @@ func Render(ctx context.Context, directory, page, output string) error {
 	if err := os.MkdirAll(filepath.Dir(absOutput), 0o755); err != nil {
 		return err
 	}
-	profile, err := os.MkdirTemp("", "lanhu-chromium-")
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(profile)
-	arguments := []string{"--headless", "--disable-gpu", "--allow-file-access-from-files", "--user-data-dir=" + profile, "--window-size=1440,1200", "--screenshot=" + absOutput, "file://" + absPage}
+	server := &http.Server{Handler: http.FileServer(http.Dir(root)), ReadHeaderTimeout: 5 * time.Second}
+	defer server.Close()
+	go func() { _ = server.Serve(listener) }()
+	relative, err := filepath.Rel(root, absPage)
+	if err != nil {
+		return err
+	}
+	pageURL := (&url.URL{Scheme: "http", Host: listener.Addr().String(), Path: "/" + filepath.ToSlash(relative)}).String()
+	options := append(chromedp.DefaultExecAllocatorOptions[:], chromedp.ExecPath(chromium), chromedp.WindowSize(1440, 1200))
 	if os.Getenv("LANHU_CHROMIUM_NO_SANDBOX") == "1" {
-		arguments = append([]string{"--no-sandbox"}, arguments...)
+		options = append(options, chromedp.NoSandbox)
 	}
 	renderContext, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(renderContext, chromium, arguments...)
-	if data, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("Chromium render failed: %w: %s", err, strings.TrimSpace(string(data)))
+	allocator, cancelAllocator := chromedp.NewExecAllocator(renderContext, options...)
+	defer cancelAllocator()
+	browser, cancelBrowser := chromedp.NewContext(allocator)
+	defer cancelBrowser()
+	var screenshot []byte
+	if err := chromedp.Run(browser,
+		chromedp.Navigate(pageURL),
+		chromedp.WaitReady("body", chromedp.ByQuery),
+		chromedp.Sleep(2*time.Second),
+		chromedp.FullScreenshot(&screenshot, 100),
+	); err != nil {
+		return fmt.Errorf("Chromium render failed: %w", err)
 	}
-	return nil
+	return os.WriteFile(absOutput, screenshot, 0o644)
 }

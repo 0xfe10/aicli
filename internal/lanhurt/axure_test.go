@@ -3,6 +3,7 @@ package lanhurt
 import (
 	"bytes"
 	"context"
+	"image/png"
 	"io"
 	"net/http"
 	"os"
@@ -38,7 +39,8 @@ func TestRenderWithInstalledChromium(t *testing.T) {
 		t.Skip("Chromium is not installed")
 	}
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte(`<html><body><h1>Lanhu Axure</h1></body></html>`), 0o600); err != nil {
+	page := `<html><body style="margin:0"><div id="top">loading</div><div style="height:1800px"></div><div id="bottom">bottom</div><script>setTimeout(()=>document.getElementById('top').textContent='ready',500)</script></body></html>`
+	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte(page), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	output := filepath.Join(dir, "screenshot.png")
@@ -49,6 +51,14 @@ func TestRenderWithInstalledChromium(t *testing.T) {
 	}
 	if info, err := os.Stat(output); err != nil || info.Size() == 0 {
 		t.Fatalf("screenshot info=%v err=%v", info, err)
+	}
+	data, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := png.DecodeConfig(bytes.NewReader(data))
+	if err != nil || config.Height < 1800 {
+		t.Fatalf("full-page screenshot size=%dx%d err=%v", config.Width, config.Height, err)
 	}
 }
 
@@ -70,7 +80,7 @@ func TestAxureLoadDownloadAndStaleDocumentRecovery(t *testing.T) {
 		case "cdn.lanhuapp.com/map.json":
 			body = `{"sitemap":{"rootNodes":[{"id":"p1","pageName":"Login","url":"login.html"}]},"pages":{"login.html":{"html":{"sign_md5":"html"},"mapping_md5":"mapping"}}}`
 		case "axure-file.lanhuapp.com/html":
-			body = `<html><head></head><body style="display:none"><img data-src="images/logo.png"></body></html>`
+			body = `<html><head><link data-src="styles.css"></head><body style="display:none; color:red"><img data-src="images/logo.png"><div id="dialog" style="display:none">hidden</div></body></html>`
 		case "axure-file.lanhuapp.com/mapping":
 			body = `{"images":{"images/logo.png":{"sign_md5":"logo"}}}`
 		case "axure-file.lanhuapp.com/logo":
@@ -95,6 +105,9 @@ func TestAxureLoadDownloadAndStaleDocumentRecovery(t *testing.T) {
 	}
 	if !bytes.Contains(html, []byte("lanhu_Axure_Mapping_Data")) || bytes.Contains(html, []byte("data-src=")) {
 		t.Fatalf("HTML was not patched: %s", html)
+	}
+	if !bytes.Contains(html, []byte(`href="styles.css"`)) || !bytes.Contains(html, []byte(`id="dialog" style="display:none"`)) || bytes.Contains(html, []byte(`<body style="display:none`)) {
+		t.Fatalf("HTML patch changed link or hidden child state: %s", html)
 	}
 	if requests["lanhuapp.com/api/project/image"] != 2 {
 		t.Fatalf("image requests=%d", requests["lanhuapp.com/api/project/image"])

@@ -58,6 +58,18 @@ func TestClientStripsCookieOnSignedHostRedirect(t *testing.T) {
 	}
 }
 
+func TestClientDoesNotAttachCookiesToNonStandardOrigins(t *testing.T) {
+	client := Client{Cookie: "lanhu", DDSCookie: "dds"}
+	for _, raw := range []string{"http://lanhuapp.com/api", "https://lanhuapp.com:8443/api", "http://dds.lanhuapp.com/api", "https://dds.lanhuapp.com:8443/api"} {
+		target, _ := url.Parse(raw)
+		req := &http.Request{URL: target, Header: http.Header{}}
+		client.applyHeaders(req)
+		if req.Header.Get("Cookie") != "" || req.Header.Get("Authorization") != "" {
+			t.Fatalf("credentials attached to %s", raw)
+		}
+	}
+}
+
 func TestHeaderAuthScopesCookiesByExactHost(t *testing.T) {
 	auth := HeaderAuth{Session: Session{Cookie: "lanhu", DDSCookie: "dds", HasCredentials: true}}
 	for _, test := range []struct {
@@ -77,5 +89,12 @@ func TestHeaderAuthScopesCookiesByExactHost(t *testing.T) {
 	req := &http.Request{URL: &url.URL{Scheme: "https", Host: "evil.example"}, Header: http.Header{}}
 	if auth.Authenticate(context.Background(), req, restishauth.AuthContext{}) == nil {
 		t.Fatal("credentials were allowed on an unrelated host")
+	}
+	for _, raw := range []string{"http://lanhuapp.com", "https://lanhuapp.com:8443", "http://dds.lanhuapp.com"} {
+		target, _ := url.Parse(raw)
+		req := &http.Request{URL: target, Header: http.Header{}}
+		if auth.Authenticate(context.Background(), req, restishauth.AuthContext{}) == nil || req.Header.Get("Cookie") != "" {
+			t.Fatalf("credentials allowed for %s", raw)
+		}
 	}
 }

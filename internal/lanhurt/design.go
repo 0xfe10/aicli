@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"image"
@@ -15,6 +16,7 @@ import (
 	_ "image/jpeg"
 	"image/png"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,6 +25,8 @@ import (
 	"strconv"
 	"strings"
 )
+
+const maxBundleBytes = 256 << 20
 
 type DesignReference struct {
 	TeamID    string
@@ -46,8 +50,9 @@ type DesignNode struct {
 }
 
 type DesignAsset struct {
-	ID  string `json:"id"`
-	URL string `json:"url"`
+	ID   string `json:"id"`
+	URL  string `json:"url"`
+	Kind string `json:"kind"`
 }
 
 type Design struct {
@@ -111,6 +116,9 @@ func (c *Client) LoadDesign(ctx context.Context, rawURL string) (Design, error) 
 	if err != nil {
 		return Design{}, err
 	}
+	if id := text(result, "id"); id != "" && id != ref.DesignID {
+		return Design{}, errors.New("returned design does not match the requested ID")
+	}
 	if kind := text(result, "type"); kind == "axure" || kind == "pdf" || kind == "word" || kind == "ppt" || kind == "excel" {
 		return Design{}, fmt.Errorf("%s is a product document, not a UI design", kind)
 	}
@@ -147,12 +155,12 @@ func (c *Client) LoadDesign(ctx context.Context, rawURL string) (Design, error) 
 		return Design{}, fmt.Errorf("decode design reference: %w", err)
 	}
 	rawBytes, _ := json.Marshal(raw)
-	design := Design{ID: first(text(result, "id"), ref.DesignID), Name: text(result, "name"), VersionID: text(version, "id"), VersionLabel: text(version, "version_info"), SourceType: text(result, "type"), ReferenceSize: image.Pt(config.Width, config.Height), RawSHA256: digest(rawBytes), reference: imageBytes.Bytes()}
-	design.Canvas = Rect{Width: number(result["width"]), Height: number(result["height"])}
-	if design.Canvas.Width == 0 || design.Canvas.Height == 0 {
-		design.Canvas.Width, design.Canvas.Height = float64(config.Width), float64(config.Height)
+	design := Design{ID: first(text(result, "id"), ref.DesignID), Name: text(result, "name"), VersionID: text(version, "id"), VersionLabel: text(version, "version_info"), ReferenceSize: image.Pt(config.Width, config.Height), RawSHA256: digest(rawBytes), reference: imageBytes.Bytes()}
+	design.Nodes, design.Assets, design.SourceType = normalizeDesign(raw)
+	design.Canvas, err = resolveCanvas(raw, design.SourceType, number(result["width"]), number(result["height"]), design.ReferenceSize)
+	if err != nil {
+		return Design{}, err
 	}
-	design.Nodes, design.Assets = normalizeDesign(raw)
 	design.DDSAvailable = c.ddsAvailable(ctx, design.VersionID)
 	return design, nil
 }
@@ -167,27 +175,48 @@ func (c *Client) ddsAvailable(ctx context.Context, versionID string) bool {
 	return err == nil && text(result, "data_resource_url") != ""
 }
 
-func normalizeDesign(raw map[string]any) ([]DesignNode, []DesignAsset) {
+func normalizeDesign(raw map[string]any) ([]DesignNode, []DesignAsset, string) {
+	sourceType := designSourceType(raw)
 	nodes := make([]DesignNode, 0)
 	assets := make([]DesignAsset, 0)
 	seenNodes, seenAssets := map[string]bool{}, map[string]bool{}
+	photoshopExports := map[string]bool{}
+	if sourceType == "photoshop" {
+		if sourceAssets, ok := raw["assets"].([]any); ok {
+			for _, item := range sourceAssets {
+				asset, _ := item.(map[string]any)
+				if id := sourceID(asset); id != "" && (flag(asset["isAsset"]) || flag(asset["isSlice"])) {
+					photoshopExports[id] = true
+				}
+			}
+		}
+	}
 	var walk func(any)
 	walk = func(value any) {
 		switch current := value.(type) {
 		case map[string]any:
-			id := first(text(current, "id"), text(current, "objectID"), text(current, "do_objectID"), text(current, "layerId"))
+			id := sourceID(current)
 			if id != "" && !seenNodes[id] {
-				if bounds := boundsOf(current); bounds != nil || text(current, "name") != "" {
+				if bounds := boundsOf(current, sourceType); bounds != nil || text(current, "name") != "" {
 					nodes = append(nodes, DesignNode{ID: id, Name: first(text(current, "name"), text(current, "layerName")), Type: first(text(current, "type"), text(current, "_class")), Bounds: bounds})
 					seenNodes[id] = true
 				}
 			}
-			for key, child := range current {
-				if value, ok := child.(string); ok && assetKey(key) && validAssetURL(value) && !seenAssets[value] {
-					assets = append(assets, DesignAsset{ID: digest([]byte(value))[:16], URL: value})
-					seenAssets[value] = true
+			exported := flag(current["exportable"]) || flag(current["hasExportImage"]) || flag(current["isAsset"]) || flag(current["isSlice"]) || photoshopExports[id]
+			if exported {
+				for _, field := range []string{"image", "images"} {
+					for _, value := range assetURLs(current[field]) {
+						if !seenAssets[value] {
+							assets = append(assets, DesignAsset{ID: digest([]byte(value))[:16], URL: value, Kind: "exported_asset"})
+							seenAssets[value] = true
+						}
+					}
 				}
-				walk(child)
+			}
+			for _, field := range []string{"layers", "children"} {
+				if child := current[field]; child != nil {
+					walk(child)
+				}
 			}
 		case []any:
 			for _, child := range current {
@@ -195,28 +224,180 @@ func normalizeDesign(raw map[string]any) ([]DesignNode, []DesignAsset) {
 			}
 		}
 	}
-	walk(raw)
+	switch sourceType {
+	case "figma":
+		walk(raw["artboard"])
+	case "photoshop":
+		walk(raw["board"])
+	case "sketch":
+		walk(raw["info"])
+	default:
+		walk(raw["layers"])
+	}
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].ID < nodes[j].ID })
-	return nodes, assets
+	return nodes, assets, sourceType
 }
 
-func boundsOf(value map[string]any) *Rect {
-	for _, key := range []string{"frame", "bounds", "rect"} {
-		if nested, ok := value[key].(map[string]any); ok {
+func designSourceType(raw map[string]any) string {
+	meta, _ := raw["meta"].(map[string]any)
+	host, _ := meta["host"].(map[string]any)
+	if strings.EqualFold(text(host, "name"), "figma") || raw["artboard"] != nil {
+		return "figma"
+	}
+	if strings.EqualFold(text(raw, "type"), "ps") || strings.EqualFold(text(raw, "type"), "photoshop") || raw["board"] != nil {
+		return "photoshop"
+	}
+	if _, ok := raw["info"].([]any); ok {
+		return "sketch"
+	}
+	return "unknown"
+}
+
+func resolveCanvas(raw map[string]any, sourceType string, apiWidth, apiHeight float64, reference image.Point) (Rect, error) {
+	canvas := Rect{Width: apiWidth, Height: apiHeight}
+	if source := sourceCanvas(raw, sourceType); source != nil {
+		if source.X != 0 || source.Y != 0 {
+			return Rect{}, errors.New("source canvas has a non-zero origin whose image mapping is not verified")
+		}
+		canvas = *source
+	}
+	if canvas.Width <= 0 || canvas.Height <= 0 {
+		return Rect{}, errors.New("source does not provide a reliable canvas size")
+	}
+	if reference.X <= 0 || reference.Y <= 0 {
+		return Rect{}, errors.New("reference image has invalid dimensions")
+	}
+	ratioError := math.Abs((float64(reference.X)/float64(reference.Y))/(canvas.Width/canvas.Height) - 1)
+	if ratioError > 0.01 {
+		return Rect{}, errors.New("reference image and source canvas aspect ratios do not match")
+	}
+	return canvas, nil
+}
+
+func sourceCanvas(raw map[string]any, sourceType string) *Rect {
+	var candidate map[string]any
+	switch sourceType {
+	case "figma":
+		candidate, _ = raw["artboard"].(map[string]any)
+	case "photoshop":
+		candidate, _ = raw["board"].(map[string]any)
+	case "sketch":
+		items, _ := raw["info"].([]any)
+		artboardID := fmt.Sprint(raw["ArtboardID"])
+		var fallback map[string]any
+		fallbacks := 0
+		for _, item := range items {
+			layer, _ := item.(map[string]any)
+			kind := first(text(layer, "ddsType"), text(layer, "type"))
+			matchesID := artboardID != "<nil>" && artboardID != "" && sourceID(layer) == artboardID
+			if matchesID {
+				candidate = layer
+				break
+			}
+			if kind == "artboard-group" || kind == "artboard" || kind == "artboardSection" {
+				fallback, fallbacks = layer, fallbacks+1
+			}
+		}
+		if candidate == nil && fallbacks == 1 {
+			candidate = fallback
+		}
+	}
+	if candidate == nil {
+		return nil
+	}
+	return boundsOf(candidate, sourceType)
+}
+
+func sourceID(value map[string]any) string {
+	for _, key := range []string{"id", "objectID", "do_objectID", "layerId"} {
+		switch id := value[key].(type) {
+		case string:
+			if id != "" {
+				return id
+			}
+		case float64:
+			if math.IsNaN(id) || math.IsInf(id, 0) {
+				continue
+			}
+			return strconv.FormatFloat(id, 'f', -1, 64)
+		}
+	}
+	return ""
+}
+
+func boundsOf(value map[string]any, sourceType string) *Rect {
+	fields := []string{"frame", "realFrame", "absoluteBoundingBox", "bounds", ""}
+	if sourceType != "figma" {
+		fields = []string{"", "frame", "bounds", "layerOriginFrame", "realFrame", "absoluteBoundingBox"}
+	}
+	for _, key := range fields {
+		nested := value
+		if key != "" {
+			nested, _ = value[key].(map[string]any)
+		}
+		if nested != nil {
 			if rect := rectOf(nested); rect != nil {
 				return rect
 			}
 		}
 	}
-	return rectOf(value)
+	return nil
 }
 
 func rectOf(value map[string]any) *Rect {
-	w, h := number(value["width"]), number(value["height"])
-	if w <= 0 || h <= 0 {
+	x, hasX := finiteNumber(value["x"])
+	if !hasX {
+		x, hasX = finiteNumber(value["left"])
+	}
+	y, hasY := finiteNumber(value["y"])
+	if !hasY {
+		y, hasY = finiteNumber(value["top"])
+	}
+	w, hasWidth := finiteNumber(value["width"])
+	h, hasHeight := finiteNumber(value["height"])
+	if !hasWidth {
+		if right, ok := finiteNumber(value["right"]); ok && hasX {
+			w, hasWidth = right-x, true
+		}
+	}
+	if !hasHeight {
+		if bottom, ok := finiteNumber(value["bottom"]); ok && hasY {
+			h, hasHeight = bottom-y, true
+		}
+	}
+	if !hasX || !hasY || !hasWidth || !hasHeight || w < 0 || h < 0 {
 		return nil
 	}
-	return &Rect{X: number(value["x"]), Y: number(value["y"]), Width: w, Height: h}
+	return &Rect{X: x, Y: y, Width: w, Height: h}
+}
+
+func flag(value any) bool {
+	if result, ok := value.(bool); ok {
+		return result
+	}
+	result, ok := finiteNumber(value)
+	return ok && result == 1
+}
+
+func assetURLs(value any) []string {
+	if raw, ok := value.(string); ok {
+		if validAssetURL(raw) {
+			return []string{raw}
+		}
+		return nil
+	}
+	mapping, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	keys := []string{"imageUrl", "png_xxxhd", "png", "url", "svgUrl", "svg", "webp", "jpeg", "jpg"}
+	result, seen := make([]string, 0), map[string]bool{}
+	for _, key := range keys {
+		if raw, ok := mapping[key].(string); ok && validAssetURL(raw) && !seen[raw] {
+			result, seen[raw] = append(result, raw), true
+		}
+	}
+	return result
 }
 
 func InspectDesign(design Design, region Rect, output string) (map[string]any, error) {
@@ -289,29 +470,28 @@ func (c *Client) ExportDesign(ctx context.Context, design Design, output string)
 		VersionID string           `json:"version_id"`
 		Assets    []map[string]any `json:"assets"`
 	}{DesignID: design.ID, VersionID: design.VersionID}
+	totalBytes := 0
 	for index, asset := range design.Assets {
 		var data bytes.Buffer
 		if err := c.get(ctx, asset.URL, &data); err != nil {
 			manifest.Assets = append(manifest.Assets, map[string]any{"id": asset.ID, "error": err.Error()})
 			continue
 		}
-		if data.Len() == 0 {
-			manifest.Assets = append(manifest.Assets, map[string]any{"id": asset.ID, "error": "downloaded asset is empty"})
+		nextTotal, sizeErr := nextBundleTotal(totalBytes, data.Len())
+		if sizeErr != nil {
+			bundle.Close()
+			tmp.Close()
+			return nil, sizeErr
+		}
+		totalBytes = nextTotal
+		ext, mediaType, width, height, inspectErr := inspectAsset(data.Bytes(), asset.URL)
+		if inspectErr != nil {
+			manifest.Assets = append(manifest.Assets, map[string]any{"id": asset.ID, "error": inspectErr.Error()})
 			continue
 		}
-		mediaType := http.DetectContentType(data.Bytes())
-		metadata := map[string]any{"id": asset.ID, "bytes": data.Len(), "sha256": digest(data.Bytes()), "media_type": mediaType}
-		if strings.HasPrefix(mediaType, "image/") && mediaType != "image/svg+xml" {
-			config, _, decodeErr := image.DecodeConfig(bytes.NewReader(data.Bytes()))
-			if decodeErr != nil {
-				manifest.Assets = append(manifest.Assets, map[string]any{"id": asset.ID, "error": "invalid raster image"})
-				continue
-			}
-			metadata["width"], metadata["height"] = config.Width, config.Height
-		}
-		ext := strings.ToLower(filepath.Ext(mustURLPath(asset.URL)))
-		if len(ext) > 8 || ext == "" {
-			ext = ".bin"
+		metadata := map[string]any{"id": asset.ID, "kind": asset.Kind, "bytes": data.Len(), "sha256": digest(data.Bytes()), "media_type": mediaType}
+		if width > 0 && height > 0 {
+			metadata["width"], metadata["height"] = width, height
 		}
 		name := fmt.Sprintf("assets/%03d-%s%s", index+1, asset.ID, ext)
 		writer, err := bundle.Create(name)
@@ -354,6 +534,82 @@ func (c *Client) ExportDesign(ctx context.Context, design Design, output string)
 	return map[string]any{"output": output, "requested": len(design.Assets), "succeeded": succeeded, "failed": len(design.Assets) - succeeded, "manifest": manifest.Assets}, nil
 }
 
+func nextBundleTotal(total, next int) (int, error) {
+	if next < 0 || total > maxBundleBytes-next {
+		return total, fmt.Errorf("asset bundle exceeds the %d MiB total download limit", maxBundleBytes>>20)
+	}
+	return total + next, nil
+}
+
+func inspectAsset(data []byte, rawURL string) (string, string, int, int, error) {
+	if len(data) == 0 {
+		return "", "", 0, 0, errors.New("downloaded asset is empty")
+	}
+	mediaType := strings.Split(http.DetectContentType(data), ";")[0]
+	extension := ""
+	switch {
+	case mediaType == "image/png":
+		extension = ".png"
+	case mediaType == "image/jpeg":
+		extension = ".jpg"
+	case mediaType == "image/gif":
+		extension = ".gif"
+	case validSVG(data):
+		mediaType, extension = "image/svg+xml", ".svg"
+	default:
+		return "", mediaType, 0, 0, fmt.Errorf("unsupported or invalid image content (%s)", mediaType)
+	}
+	declared := strings.ToLower(filepath.Ext(mustURLPath(rawURL)))
+	aliases := map[string]string{".jpeg": ".jpg"}
+	if alias := aliases[declared]; alias != "" {
+		declared = alias
+	}
+	if declared != "" && declared != extension && declared != ".bin" {
+		return "", mediaType, 0, 0, fmt.Errorf("asset extension %s does not match downloaded %s content", declared, extension)
+	}
+	if extension == ".png" || extension == ".jpg" || extension == ".gif" {
+		config, _, err := image.DecodeConfig(bytes.NewReader(data))
+		if err != nil || config.Width <= 0 || config.Height <= 0 {
+			return "", mediaType, 0, 0, errors.New("invalid raster image")
+		}
+		return extension, mediaType, config.Width, config.Height, nil
+	}
+	return extension, mediaType, 0, 0, nil
+}
+
+func validSVG(data []byte) bool {
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	depth, root := 0, false
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			return root && depth == 0
+		}
+		if err != nil {
+			return false
+		}
+		switch token := token.(type) {
+		case xml.StartElement:
+			if depth == 0 {
+				if root || token.Name.Local != "svg" {
+					return false
+				}
+				root = true
+			}
+			depth++
+		case xml.EndElement:
+			depth--
+			if depth < 0 {
+				return false
+			}
+		case xml.CharData:
+			if depth == 0 && strings.TrimSpace(string(token)) != "" {
+				return false
+			}
+		}
+	}
+}
+
 func apiResult(envelope map[string]any) (map[string]any, error) {
 	code := fmt.Sprint(envelope["code"])
 	if code != "0" && code != "00000" {
@@ -378,14 +634,6 @@ func stripOSSProcess(raw string) string {
 	return u.String()
 }
 
-func assetKey(key string) bool {
-	key = strings.ToLower(key)
-	if strings.Contains(key, "json") || strings.Contains(key, "schema") || strings.Contains(key, "dds") {
-		return false
-	}
-	return strings.Contains(key, "url") || strings.Contains(key, "src") || strings.Contains(key, "image") || strings.Contains(key, "export")
-}
-
 func validAssetURL(raw string) bool {
 	u, err := url.Parse(raw)
 	return err == nil && u.Scheme == "https" && allowedHost(u.Hostname())
@@ -396,18 +644,31 @@ func intersects(a, b Rect) bool {
 }
 
 func number(value any) float64 {
+	result, _ := finiteNumber(value)
+	return result
+}
+
+func finiteNumber(value any) (float64, bool) {
+	var result float64
 	switch value := value.(type) {
 	case float64:
-		return value
+		result = value
 	case json.Number:
-		result, _ := value.Float64()
-		return result
+		var err error
+		result, err = value.Float64()
+		if err != nil {
+			return 0, false
+		}
 	case string:
-		result, _ := strconv.ParseFloat(value, 64)
-		return result
+		var err error
+		result, err = strconv.ParseFloat(value, 64)
+		if err != nil {
+			return 0, false
+		}
 	default:
-		return 0
+		return 0, false
 	}
+	return result, !math.IsNaN(result) && !math.IsInf(result, 0)
 }
 
 func text(value map[string]any, key string) string {

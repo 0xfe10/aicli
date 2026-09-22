@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	restishauth "github.com/rest-sh/restish/v2/auth"
 )
@@ -19,7 +20,10 @@ func (a *HeaderAuth) Authenticate(_ context.Context, req *http.Request, _ restis
 	if !a.Session.HasCredentials {
 		return fmt.Errorf("Lanhu authentication is not configured; run %q or set LANHU_COOKIE", "lanhu auth login --mode cookie")
 	}
-	switch req.URL.Hostname() {
+	if !exactHTTPSOrigin(req.URL) {
+		return fmt.Errorf("refusing to attach Lanhu credentials to non-standard origin %q", req.URL.Scheme+"://"+req.URL.Host)
+	}
+	switch strings.ToLower(req.URL.Hostname()) {
 	case "lanhuapp.com":
 		req.Header.Set("Cookie", a.Session.Cookie)
 		req.Header.Set("Referer", "https://lanhuapp.com/web/")
