@@ -1,0 +1,77 @@
+openapi: 3.0.3
+info:
+  title: Observed Lanhu Web API
+  version: "1"
+servers:
+  - url: https://lanhuapp.com
+security:
+  - lanhuCookie: []
+tags:
+  - name: project
+  - name: design
+  - name: dds
+paths:
+  /api/project/product_documents:
+    get:
+      tags: [project]
+      operationId: listDocuments
+      parameters:
+        - {name: team_id, in: query, required: true, schema: {type: string}}
+        - {name: project_id, in: query, required: true, schema: {type: string}}
+      responses: {'200': {description: Lanhu response, content: {application/json: {schema: {type: object, additionalProperties: true}}}}}
+  /api/project/image:
+    get:
+      tags: [project]
+      operationId: getImage
+      parameters:
+        - {name: project_id, in: query, schema: {type: string}}
+        - {name: pid, in: query, schema: {type: string}}
+        - {name: image_id, in: query, required: true, schema: {type: string}}
+        - {name: team_id, in: query, schema: {type: string}}
+        - {name: dds_status, in: query, schema: {type: integer}}
+      responses: {'200': {description: Lanhu response, content: {application/json: {schema: {type: object, additionalProperties: true}}}}}
+  /api/project/multi_info:
+    get:
+      tags: [project]
+      operationId: getInfo
+      parameters:
+        - {name: project_id, in: query, required: true, schema: {type: string}}
+        - {name: team_id, in: query, schema: {type: string}}
+        - {name: doc_info, in: query, schema: {type: integer}}
+        - {name: img_limit, in: query, schema: {type: integer}}
+        - {name: detach, in: query, schema: {type: integer}}
+      responses: {'200': {description: Lanhu response, content: {application/json: {schema: {type: object, additionalProperties: true}}}}}
+  /api/project/images:
+    get:
+      tags: [design]
+      operationId: list
+      parameters:
+        - {name: project_id, in: query, required: true, schema: {type: string}}
+        - {name: team_id, in: query, schema: {type: string}}
+        - {name: dds_status, in: query, schema: {type: integer}}
+        - {name: position, in: query, schema: {type: integer}}
+        - {name: show_cb_src, in: query, schema: {type: integer}}
+        - {name: comment, in: query, schema: {type: integer}}
+      responses: {'200': {description: Lanhu response, content: {application/json: {schema: {type: object, additionalProperties: true}}}}}
+  /api/project/project_sectors:
+    get:
+      tags: [design]
+      operationId: listSectors
+      parameters:
+        - {name: project_id, in: query, required: true, schema: {type: string}}
+      responses: {'200': {description: Lanhu response, content: {application/json: {schema: {type: object, additionalProperties: true}}}}}
+  /api/dds/image/store_schema_revise:
+    servers:
+      - url: https://dds.lanhuapp.com
+    get:
+      tags: [dds]
+      operationId: getSchemaSource
+      parameters:
+        - {name: version_id, in: query, required: true, schema: {type: string}}
+      responses: {'200': {description: DDS response, content: {application/json: {schema: {type: object, additionalProperties: true}}}}}
+components:
+  securitySchemes:
+    lanhuCookie:
+      type: apiKey
+      in: cookie
+      name: Cookie

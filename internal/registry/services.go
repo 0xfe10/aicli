@@ -27,5 +27,11 @@ func Services() []Service {
 			Status:  "active",
 			Command: "ozon",
 		},
+		{
+			ID:      "lanhu",
+			Name:    "Lanhu",
+			Status:  "experimental",
+			Command: "lanhu",
+		},
 	}
 }
