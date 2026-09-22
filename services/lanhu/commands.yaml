@@ -1,0 +1,25 @@
+commands:
+  - name: project list-documents
+    usage: lanhu project list-documents <team-id> <project-id>
+  - name: project get-image
+    usage: lanhu project get-image <image-id> [--project-id ID]
+  - name: project get-info
+    usage: lanhu project get-info <project-id>
+  - name: design list
+    usage: lanhu design list <project-id>
+  - name: design list-sectors
+    usage: lanhu design list-sectors <project-id>
+  - name: dds get-schema-source
+    usage: lanhu dds get-schema-source <version-id>
+  - name: design overview
+    usage: lanhu design overview <lanhu-url>
+  - name: design inspect
+    usage: lanhu design inspect <lanhu-url> --region x,y,width,height --output crop.png
+  - name: design export
+    usage: lanhu design export <lanhu-url> --output assets.zip
+  - name: axure pages
+    usage: lanhu axure pages <lanhu-url>
+  - name: axure download
+    usage: lanhu axure download <lanhu-url> <output-dir>
+  - name: axure render
+    usage: lanhu axure render <download-dir> <page.html> <output.png>

@@ -1,0 +1,28 @@
+id: lanhu
+name: Lanhu
+status: experimental
+implementation:
+  type: go-command
+  repository: https://github.com/0xfe10/aicli
+  package: ./cmd/lanhu
+  command: lanhu
+authentication:
+  supported: [cookie]
+  default: cookie
+  local_commands:
+    - auth login --mode cookie
+    - auth status
+    - auth logout
+  config_path: $XDG_CONFIG_HOME/aicli/lanhu/config.toml
+  environment_override: true
+surface:
+  source: embedded-observed-openapi
+  generation: runtime
+  layout: tags
+  coverage: six-observed-read-operations
+safety:
+  write_mode_default: readonly
+notes:
+  - LANHU_COOKIE and optional DDS_COOKIE override secure local configuration.
+  - Chromium is discovered from PATH or LANHU_CHROMIUM for Axure screenshots.
+  - LANHU_CHROMIUM_NO_SANDBOX=1 is an explicit root-container escape hatch and is disabled by default.

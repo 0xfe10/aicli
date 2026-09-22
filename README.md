@@ -8,11 +8,12 @@ a separate Restish installation is not needed.
 
 ## Structure
 
-- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`, `ozon`).
+- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`, `ozon`, `lanhu`).
 - `internal/pingcodert/` adapts PingCode's API description and authentication to Restish.
 - `internal/swagger2rt/` converts Swagger / OpenAPI 2 documents to OpenAPI 3 for Restish.
 - `internal/fnsrt/` adapts Fast Note Sync (FNS) specs, auth, and write safety to Restish.
 - `internal/ozonrt/` repairs the Ozon Seller OpenAPI and applies header auth and operation-level write safety.
+- `internal/lanhurt/` provides the observed Lanhu API, Cookie auth, design workflows, and Axure rendering.
 - `internal/cli/` contains JSON helpers used by the `aicli` registry command.
 - `services/` contains service registrations and command-surface metadata.
 - `openwiki/` contains repository knowledge and architecture decisions.
@@ -161,12 +162,51 @@ is pinned because Ozon does not currently publish a stable raw OpenAPI URL that
 this project can consume directly. The adapter removes credential parameters,
 repairs known invalid schema metadata, and generates all operations at runtime.
 
+## Lanhu (`lanhu`)
+
+Lanhu uses a browser session Cookie because its project and design endpoints are
+private web APIs. Save it interactively, or inject it from a secret manager:
+
+```sh
+lanhu auth login --mode cookie
+export LANHU_COOKIE='...'
+export DDS_COOKIE='...'       # optional; falls back to LANHU_COOKIE
+```
+
+Raw read-only API operations are generated from the embedded observed OpenAPI
+contract:
+
+```sh
+lanhu project list-documents TEAM_ID PROJECT_ID
+lanhu project get-image IMAGE_ID --project-id PROJECT_ID
+lanhu design list PROJECT_ID
+lanhu dds get-schema-source VERSION_ID
+```
+
+Local workflows compose those APIs and signed resources:
+
+```sh
+lanhu design overview '<design-url>'
+lanhu design inspect '<design-url>' --region 0,0,800,600 --output crop.png
+lanhu design export '<design-url>' --output assets.zip
+lanhu axure pages '<document-url>'
+lanhu axure download '<document-url>' ./prototype
+lanhu axure render ./prototype index.html screenshot.png
+```
+
+`axure render` uses Chromium found on `PATH`; set `LANHU_CHROMIUM` to an explicit
+binary when needed. Root-only containers may explicitly set
+`LANHU_CHROMIUM_NO_SANDBOX=1`; it is never enabled by default. Cookies are
+attached only to the exact Lanhu and DDS API
+origins, never to signed CDN or OSS downloads.
+
 ## Build and verify
 
 ```sh
 just verify
 just test-fns
 just test-ozon
+just test-lanhu
 just fns-spec-check
 just ozon-spec-check
 just verify-fns

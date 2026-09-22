@@ -1,7 +1,7 @@
 # Third-party notices
 
-This file records licenses for third-party code linked into `pingcode`,
-`fns`, and `aicli` release binaries.
+This file records licenses for third-party code linked into `pingcode`, `fns`,
+`ozon`, `lanhu`, and `aicli` release binaries.
 
 Evidence is maintained under `openwiki/compliance/`:
 
@@ -14,9 +14,10 @@ Evidence is maintained under `openwiki/compliance/`:
 ## Summary
 
 - Direct dependency: Restish `v2.3.0` (MIT)
+- Direct dependency for Lanhu full-page rendering: `github.com/chromedp/chromedp` `v0.14.2` (MIT)
 - Direct dependency for FNS Swagger conversion: `github.com/getkin/kin-openapi` `v0.145.0` (MIT)
 - Direct dependency for YAML decode: `gopkg.in/yaml.v3` `v3.0.1` (MIT)
-- Linked module union for `./cmd/aicli`, `./cmd/pingcode`, and `./cmd/fns`: see inventory
+- Linked module union for all release commands: see inventory
 - No GPLv3 detected in LICENSE scan of the linked closure
 - Apache-2.0 modules are present (for example `amazon-ion/ion-go`); include their NOTICE files from `openwiki/compliance/notices/` with release artifacts when shipping binaries
 - Vulnerability status has an upstream residual: `github.com/shamaton/msgpack/v3`

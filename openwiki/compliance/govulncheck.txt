@@ -7,55 +7,55 @@ Vulnerability #1: GO-2026-4740
     Found in: github.com/shamaton/msgpack/v3@v3.1.2
     Fixed in: N/A
     Example traces found:
-      #1: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls common.Common.CollectFields
-      #2: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls common.init
-      #3: internal/pingcodert/loader.go:120:32: pingcodert.ConvertAPIDoc calls json.Marshal, which eventually calls common.init
-      #4: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decoding.Decode
+      #1: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls common.Common.CollectFields
+      #2: internal/contextflow/context.go:217:15: contextflow.MaybeRun calls fmt.Fprintln, which eventually calls common.init
+      #3: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls common.init
+      #4: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decoding.Decode
       #5: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls decoding.init
       #6: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls decoding.init
-      #7: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int16FromInt64
-      #8: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int32FromInt64
-      #9: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int64FromFloat64
-      #10: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int64FromInt16Bits
-      #11: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int64FromInt32Bits
-      #12: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int64FromInt64Bits
-      #13: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int64FromInt8Byte
-      #14: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int64FromUint64
-      #15: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int8FromByte
-      #16: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Int8FromInt64
-      #17: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.IntFromInt64
-      #18: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.IntValueForKind
-      #19: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Uint16FromUint64
-      #20: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Uint32FromUint64
-      #21: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Uint64FromInt64
-      #22: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.Uint8FromUint64
-      #23: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.UintFromUint64
-      #24: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls decodingutil.UintValueForKind
+      #7: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Int16FromInt64
+      #8: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Int32FromInt64
+      #9: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Int64FromFloat64
+      #10: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Int64FromInt16Bits
+      #11: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Int64FromInt32Bits
+      #12: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Int64FromInt64Bits
+      #13: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Int64FromInt8Byte
+      #14: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Int64FromUint64
+      #15: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Int8FromByte
+      #16: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Int8FromInt64
+      #17: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.IntFromInt64
+      #18: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.IntValueForKind
+      #19: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Uint16FromUint64
+      #20: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Uint32FromUint64
+      #21: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Uint64FromInt64
+      #22: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.Uint8FromUint64
+      #23: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.UintFromUint64
+      #24: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls decodingutil.UintValueForKind
       #25: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls decodingutil.init
-      #26: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls def.ComplexTypeCode
+      #26: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls def.ComplexTypeCode
       #27: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls def.init
-      #28: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls encoding.Encode
+      #28: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls encoding.Encode
       #29: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls encoding.init
       #30: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls encoding.init
-      #31: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.DecoderCommon.ReadSize1
-      #32: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.DecoderCommon.ReadSize4
-      #33: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.DecoderCommon.ReadSize8
-      #34: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte1Int
-      #35: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte4Int
-      #36: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte4Uint64
-      #37: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte8Int64
-      #38: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte8Uint64
+      #31: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls ext.DecoderCommon.ReadSize1
+      #32: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls ext.DecoderCommon.ReadSize4
+      #33: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls ext.DecoderCommon.ReadSize8
+      #34: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte1Int
+      #35: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte4Int
+      #36: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte4Uint64
+      #37: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte8Int64
+      #38: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls ext.EncoderCommon.SetByte8Uint64
       #39: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls ext.init
-      #40: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls msgpack.Marshal
-      #41: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls msgpack.Unmarshal
+      #40: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls msgpack.Marshal
+      #41: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls msgpack.Unmarshal
       #42: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls msgpack.init
       #43: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls time.init
-      #44: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls time.timeDecoder.AsValue
+      #44: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls time.timeDecoder.AsValue
       #45: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls time.timeDecoder.Code
-      #46: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls time.timeDecoder.IsType
-      #47: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls time.timeEncoder.CalcByteSize
+      #46: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls time.timeDecoder.IsType
+      #47: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls time.timeEncoder.CalcByteSize
       #48: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls time.timeEncoder.Type
-      #49: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls time.timeEncoder.WriteToBytes
+      #49: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls time.timeEncoder.WriteToBytes
       #50: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls time.timeStreamDecoder.Code
       #51: internal/swagger2rt/loader.go:13:2: swagger2rt.init calls restish.init, which eventually calls time.timeStreamEncoder.Type
 
@@ -66,7 +66,7 @@ Vulnerability #2: GO-2026-4513
     Found in: github.com/shamaton/msgpack/v3@v3.1.2
     Fixed in: N/A
     Example traces found:
-      #1: cmd/pingcode/main.go:31:19: pingcode.main calls cli.CLI.Run, which eventually calls msgpack.Unmarshal
+      #1: internal/fnsrt/runtime.go:197:16: fnsrt.RunCLIWithContext calls cli.CLI.Run, which eventually calls msgpack.Unmarshal
 
 Your code is affected by 2 vulnerabilities from 1 module.
 This scan found no other vulnerabilities in packages you import or modules you
