@@ -2,18 +2,19 @@
 
 `aicli` is a Go monorepo for AI-oriented service CLIs.
 
-Service CLIs embed [Restish](https://rest.sh/) v2.3.0 and generate commands from
-each service's API description at runtime. Users install one binary per service;
-a separate Restish installation is not needed.
+OpenAPI service CLIs embed [Restish](https://rest.sh/) v2.3.0. MCP services use
+the pinned [mcp2cli](https://github.com/mcp2cli/source-code) runtime shipped in
+their release archive. Users install one command per service.
 
 ## Structure
 
-- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`, `ozon`, `lanhu`).
+- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`, `ozon`, `lanhu`, `devopsh`).
 - `internal/pingcodert/` adapts PingCode's API description and authentication to Restish.
 - `internal/swagger2rt/` converts Swagger / OpenAPI 2 documents to OpenAPI 3 for Restish.
 - `internal/fnsrt/` adapts Fast Note Sync (FNS) specs, auth, and write safety to Restish.
 - `internal/ozonrt/` repairs the Ozon Seller OpenAPI and applies header auth and operation-level write safety.
 - `internal/lanhurt/` provides the observed Lanhu API, Cookie auth, design workflows, and Axure rendering.
+- `internal/devopshrt/` binds DevOpsH to the packaged mcp2cli runtime.
 - `internal/cli/` contains JSON helpers used by the `aicli` registry command.
 - `services/` contains service registrations and command-surface metadata.
 - `openwiki/` contains repository knowledge and architecture decisions.
@@ -200,6 +201,19 @@ binary when needed. Root-only containers may explicitly set
 attached only to the exact Lanhu and DDS API
 origins, never to signed CDN or OSS downloads.
 
+## DevOpsH (`devopsh`)
+
+```sh
+devopsh auth login
+devopsh ls
+devopsh --help
+devopsh context use staging
+devopsh --context production auth login
+```
+
+Bearer tokens and discovery caches are isolated per context. Release archives
+contain both `devopsh` and the pinned `mcp2cli` runtime.
+
 ## Build and verify
 
 ```sh
@@ -207,6 +221,7 @@ just verify
 just test-fns
 just test-ozon
 just test-lanhu
+just test-devopsh
 just fns-spec-check
 just ozon-spec-check
 just verify-fns

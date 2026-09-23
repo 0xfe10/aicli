@@ -3,6 +3,7 @@ set shell := ["bash", "-eo", "pipefail", "-c"]
 version := env_var_or_default("VERSION", "0.1.0")
 commit := env_var_or_default("COMMIT", `git rev-parse --short=12 HEAD 2>/dev/null || echo unknown`)
 out_dir := env_var_or_default("OUT_DIR", "dist")
+mcp2cli_version := "0.1.10"
 
 default:
     @just --list
@@ -109,6 +110,9 @@ test-ozon:
 test-lanhu:
     go test ./internal/lanhurt ./cmd/lanhu
 
+test-devopsh:
+    go test ./internal/devopshrt ./cmd/devopsh
+
 build-fns: _validate-version
     @just _build-fns linux amd64
     @just _build-fns linux arm64
@@ -161,6 +165,10 @@ release-build: _validate-version
     @just build-archive lanhu darwin arm64
     @just build-archive lanhu windows amd64
     @just build-archive lanhu windows arm64
+    @just build-archive devopsh linux amd64
+    @just build-archive devopsh linux arm64
+    @just build-archive devopsh darwin amd64
+    @just build-archive devopsh darwin arm64
     @just release-checksums
     @echo "release artifacts in {{ out_dir }}"
     @ls -lh "{{ out_dir }}"
@@ -173,8 +181,8 @@ release-checksums: _validate-version
     set -euo pipefail
     cd "{{ out_dir }}"
     archive_count="$(find . -maxdepth 1 -type f \( -name '*_{{ version }}_*.tar.gz' -o -name '*_{{ version }}_*.zip' \) | wc -l)"
-    if [[ "$archive_count" -ne 30 ]]; then
-      echo "expected 30 release archives, found ${archive_count}" >&2
+    if [[ "$archive_count" -ne 34 ]]; then
+      echo "expected 34 release archives, found ${archive_count}" >&2
       exit 1
     fi
     sha256sum ./*_"{{ version }}"_*.tar.gz ./*_"{{ version }}"_*.zip > checksums.txt
@@ -267,6 +275,26 @@ _build-archive command goos goarch:
       go build -trimpath -buildvcs=false -ldflags "$ldflags" \
       -o "${stage}/${binary}" "./cmd/${command}"
 
+    if [[ "$command" == "devopsh" ]]; then
+      case "${goos}/${goarch}" in
+        linux/amd64) target=x86_64-unknown-linux-musl; expected=a0e53b0685638b0263415fa891d5884f52419b24579dc513fd2db1c11327735e ;;
+        linux/arm64) target=aarch64-unknown-linux-musl; expected=0fd984d7398d1d6db8b583d63a33dbdfaab3c928c59848299addfdfd50121b6c ;;
+        darwin/amd64) target=x86_64-apple-darwin; expected=57df130f2b09762690bb856364cde61bb93ec512b46a2c0147b0527d7675833c ;;
+        darwin/arm64) target=aarch64-apple-darwin; expected=f292de88842ef767f71b967d13276cd083ca3a70a08af1a9870ee102dca3792d ;;
+        *) echo "mcp2cli {{ mcp2cli_version }} is unavailable for ${goos}/${goarch}" >&2; exit 64 ;;
+      esac
+      runtime_archive="${stage}/mcp2cli.tar.xz"
+      curl --fail --silent --show-error --location \
+        "https://github.com/mcp2cli/source-code/releases/download/v{{ mcp2cli_version }}/mcp2cli-{{ mcp2cli_version }}-${target}.tar.xz" \
+        --output "$runtime_archive"
+      printf '%s  %s\n' "$expected" "$runtime_archive" | sha256sum -c -
+      tar -xJf "$runtime_archive" -C "$stage" --strip-components=1 \
+        "mcp2cli-{{ mcp2cli_version }}-${target}/mcp2cli" \
+        "mcp2cli-{{ mcp2cli_version }}-${target}/LICENSE"
+      mv "${stage}/LICENSE" "${stage}/MCP2CLI_LICENSE"
+      rm "$runtime_archive"
+    fi
+
     cp LICENSE THIRD_PARTY_NOTICES.md "$stage/"
     chmod 0755 "${stage}/${binary}"
     chmod 0644 "${stage}/LICENSE" "${stage}/THIRD_PARTY_NOTICES.md"
@@ -277,10 +305,15 @@ _build-archive command goos goarch:
         zip -q "${output_dir}/${archive_base}.zip" "$binary" LICENSE THIRD_PARTY_NOTICES.md
       )
     else
-      tar -C "$stage" -czf "${output_dir}/${archive_base}.tar.gz" \
-        "$binary" LICENSE THIRD_PARTY_NOTICES.md
+      files=("$binary" LICENSE THIRD_PARTY_NOTICES.md)
+      if [[ "$command" == "devopsh" ]]; then files+=(mcp2cli MCP2CLI_LICENSE); fi
+      tar -C "$stage" -czf "${output_dir}/${archive_base}.tar.gz" "${files[@]}"
     fi
     rm "${stage}/${binary}"
     rm "${stage}/LICENSE"
     rm "${stage}/THIRD_PARTY_NOTICES.md"
+    if [[ "$command" == "devopsh" ]]; then
+      rm "${stage}/mcp2cli"
+      rm "${stage}/MCP2CLI_LICENSE"
+    fi
     rmdir "$stage"

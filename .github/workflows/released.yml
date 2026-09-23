@@ -90,6 +90,7 @@ jobs:
           - fns
           - ozon
           - lanhu
+          - devopsh
         goos:
           - linux
           - darwin
@@ -97,6 +98,13 @@ jobs:
         goarch:
           - amd64
           - arm64
+        exclude:
+          - command: devopsh
+            goos: windows
+            goarch: amd64
+          - command: devopsh
+            goos: windows
+            goarch: arm64
 
     steps:
       - name: Check out release commit

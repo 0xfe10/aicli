@@ -1,0 +1,24 @@
+id: devopsh
+name: DevOpsH
+status: experimental
+implementation:
+  type: mcp2cli-command
+  repository: https://github.com/0xfe10/aicli
+  package: ./cmd/devopsh
+  command: devopsh
+  runtime: mcp2cli@0.1.10
+authentication:
+  supported: [bearer]
+  default: bearer
+  local_commands:
+    - auth login
+    - auth status
+    - auth logout
+  environment_override: false
+surface:
+  source: https://backend-stg.hast.so/api/public/v1/mcp
+  generation: runtime-mcp-discovery
+  layout: json-schema
+notes:
+  - Authorization is stored by mcp2cli inside the selected aicli context cache.
+  - Select profiles with devopsh --context NAME or devopsh context use NAME.
