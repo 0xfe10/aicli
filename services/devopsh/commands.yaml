@@ -1,0 +1,7 @@
+commands:
+  - name: auth login
+    usage: devopsh auth login
+  - name: ls
+    usage: devopsh ls
+  - name: dynamic tools
+    usage: devopsh <discovered-tool> [flags]

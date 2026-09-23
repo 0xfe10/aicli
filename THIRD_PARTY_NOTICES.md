@@ -1,7 +1,7 @@
 # Third-party notices
 
 This file records licenses for third-party code linked into `pingcode`, `fns`,
-`ozon`, `lanhu`, and `aicli` release binaries.
+`ozon`, `lanhu`, `devopsh`, and `aicli` release binaries.
 
 Evidence is maintained under `openwiki/compliance/`:
 
@@ -17,6 +17,7 @@ Evidence is maintained under `openwiki/compliance/`:
 - Direct dependency for Lanhu full-page rendering: `github.com/chromedp/chromedp` `v0.14.2` (MIT)
 - Direct dependency for FNS Swagger conversion: `github.com/getkin/kin-openapi` `v0.145.0` (MIT)
 - Direct dependency for YAML decode: `gopkg.in/yaml.v3` `v3.0.1` (MIT)
+- Runtime distributed with DevOpsH: `mcp2cli` `v0.1.10` (Apache-2.0)
 - Linked module union for all release commands: see inventory
 - No GPLv3 detected in LICENSE scan of the linked closure
 - Apache-2.0 modules are present (for example `amazon-ion/ion-go`); include their NOTICE files from `openwiki/compliance/notices/` with release artifacts when shipping binaries
