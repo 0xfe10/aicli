@@ -45,7 +45,11 @@ func Run(args []string, selection contextflow.Selection) error {
 	if err := os.WriteFile(configPath, []byte(config), 0o600); err != nil {
 		return fmt.Errorf("write devopsh runtime config: %w", err)
 	}
-	runtime, err := runtimePath(args[0])
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("locate devopsh executable: %w", err)
+	}
+	runtime, err := runtimePath(args[0], executable)
 	if err != nil {
 		return err
 	}
@@ -72,18 +76,37 @@ func Run(args []string, selection contextflow.Selection) error {
 	return nil
 }
 
-func runtimePath(argv0 string) (string, error) {
+func runtimePath(invokedAs, executable string) (string, error) {
 	if path := strings.TrimSpace(os.Getenv("DEVOPSH_MCP2CLI")); path != "" {
 		return path, nil
 	}
-	if absolute, err := filepath.Abs(argv0); err == nil {
-		path := filepath.Join(filepath.Dir(absolute), "mcp2cli")
-		if info, err := os.Stat(path); err == nil && !info.IsDir() {
-			return path, nil
+	const runtimeName = "devopsh-mcp2cli"
+	invokedPath := invokedAs
+	if !strings.ContainsRune(invokedPath, os.PathSeparator) {
+		if path, err := exec.LookPath(invokedPath); err == nil {
+			invokedPath = path
 		}
 	}
-	if path, err := exec.LookPath("mcp2cli"); err == nil {
+	if absolute, err := filepath.Abs(invokedPath); err == nil {
+		invokedPath = absolute
+	}
+	if path := siblingRuntime(invokedPath, runtimeName); path != "" {
 		return path, nil
 	}
-	return "", fmt.Errorf("mcp2cli runtime not found beside devopsh or on PATH")
+	realExecutable, err := filepath.EvalSymlinks(executable)
+	if err != nil {
+		return "", fmt.Errorf("resolve devopsh executable: %w", err)
+	}
+	if path := siblingRuntime(realExecutable, runtimeName); path != "" {
+		return path, nil
+	}
+	return "", fmt.Errorf("%s runtime not found beside devopsh; set DEVOPSH_MCP2CLI for local development", runtimeName)
+}
+
+func siblingRuntime(executable, name string) string {
+	path := filepath.Join(filepath.Dir(executable), name)
+	if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
+		return path
+	}
+	return ""
 }

@@ -291,6 +291,7 @@ _build-archive command goos goarch:
       tar -xJf "$runtime_archive" -C "$stage" --strip-components=1 \
         "mcp2cli-{{ mcp2cli_version }}-${target}/mcp2cli" \
         "mcp2cli-{{ mcp2cli_version }}-${target}/LICENSE"
+      mv "${stage}/mcp2cli" "${stage}/devopsh-mcp2cli"
       mv "${stage}/LICENSE" "${stage}/MCP2CLI_LICENSE"
       rm "$runtime_archive"
     fi
@@ -306,14 +307,14 @@ _build-archive command goos goarch:
       )
     else
       files=("$binary" LICENSE THIRD_PARTY_NOTICES.md)
-      if [[ "$command" == "devopsh" ]]; then files+=(mcp2cli MCP2CLI_LICENSE); fi
+      if [[ "$command" == "devopsh" ]]; then files+=(devopsh-mcp2cli MCP2CLI_LICENSE); fi
       tar -C "$stage" -czf "${output_dir}/${archive_base}.tar.gz" "${files[@]}"
     fi
     rm "${stage}/${binary}"
     rm "${stage}/LICENSE"
     rm "${stage}/THIRD_PARTY_NOTICES.md"
     if [[ "$command" == "devopsh" ]]; then
-      rm "${stage}/mcp2cli"
+      rm "${stage}/devopsh-mcp2cli"
       rm "${stage}/MCP2CLI_LICENSE"
     fi
     rmdir "$stage"

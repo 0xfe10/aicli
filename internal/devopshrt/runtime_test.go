@@ -12,7 +12,7 @@ import (
 func TestRuntimePathPrefersExplicitOverride(t *testing.T) {
 	want := filepath.Join(t.TempDir(), "mcp2cli")
 	t.Setenv("DEVOPSH_MCP2CLI", want)
-	got, err := runtimePath("devopsh")
+	got, err := runtimePath("devopsh", "devopsh")
 	if err != nil || got != want {
 		t.Fatalf("runtimePath() = %q, %v", got, err)
 	}
@@ -20,13 +20,50 @@ func TestRuntimePathPrefersExplicitOverride(t *testing.T) {
 
 func TestRuntimePathFindsSibling(t *testing.T) {
 	dir := t.TempDir()
-	runtime := filepath.Join(dir, "mcp2cli")
+	devopsh := filepath.Join(dir, "devopsh")
+	runtime := filepath.Join(dir, "devopsh-mcp2cli")
+	if err := os.WriteFile(devopsh, nil, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(runtime, nil, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	wrongDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(wrongDir, "mcp2cli"), nil, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("DEVOPSH_MCP2CLI", "")
-	got, err := runtimePath(filepath.Join(dir, "devopsh"))
+	t.Setenv("PATH", wrongDir)
+	got, err := runtimePath(devopsh, devopsh)
 	if err != nil || got != runtime {
+		t.Fatalf("runtimePath() = %q, %v", got, err)
+	}
+}
+
+func TestRuntimePathFindsShimSibling(t *testing.T) {
+	root := t.TempDir()
+	shimDir, releaseDir := filepath.Join(root, "shims"), filepath.Join(root, "release")
+	if err := os.MkdirAll(shimDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(releaseDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	realDevopsh := filepath.Join(releaseDir, "devopsh")
+	if err := os.WriteFile(realDevopsh, nil, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	shim := filepath.Join(shimDir, "devopsh")
+	if err := os.Symlink(realDevopsh, shim); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(shimDir, "devopsh-mcp2cli")
+	if err := os.WriteFile(want, nil, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEVOPSH_MCP2CLI", "")
+	got, err := runtimePath(shim, realDevopsh)
+	if err != nil || got != want {
 		t.Fatalf("runtimePath() = %q, %v", got, err)
 	}
 }
