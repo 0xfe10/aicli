@@ -271,10 +271,6 @@ _build-archive command goos goarch:
 
     stage="$(mktemp -d)"
     echo "building ${archive_base}"
-    CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
-      go build -trimpath -buildvcs=false -ldflags "$ldflags" \
-      -o "${stage}/${binary}" "./cmd/${command}"
-
     if [[ "$command" == "devopsh" ]]; then
       case "${goos}/${goarch}" in
         linux/amd64) target=x86_64-unknown-linux-musl; expected=a0e53b0685638b0263415fa891d5884f52419b24579dc513fd2db1c11327735e ;;
@@ -291,9 +287,22 @@ _build-archive command goos goarch:
       tar -xJf "$runtime_archive" -C "$stage" --strip-components=1 \
         "mcp2cli-{{ mcp2cli_version }}-${target}/mcp2cli" \
         "mcp2cli-{{ mcp2cli_version }}-${target}/LICENSE"
-      mv "${stage}/mcp2cli" "${stage}/devopsh-mcp2cli"
+      runtime_sha="$(sha256sum "${stage}/mcp2cli" | awk '{print $1}')"
+      trap 'rm -f internal/devopshrt/runtime.gz' EXIT
+      gzip -n -9 -c "${stage}/mcp2cli" > internal/devopshrt/runtime.gz
       mv "${stage}/LICENSE" "${stage}/MCP2CLI_LICENSE"
       rm "$runtime_archive"
+      rm "${stage}/mcp2cli"
+      ldflags+=" -X github.com/0xfe10/aicli/internal/devopshrt.runtimeSHA256=${runtime_sha}"
+      CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+        go build -tags embedded_runtime -trimpath -buildvcs=false -ldflags "$ldflags" \
+        -o "${stage}/${binary}" "./cmd/${command}"
+      rm internal/devopshrt/runtime.gz
+      trap - EXIT
+    else
+      CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+        go build -trimpath -buildvcs=false -ldflags "$ldflags" \
+        -o "${stage}/${binary}" "./cmd/${command}"
     fi
 
     cp LICENSE THIRD_PARTY_NOTICES.md "$stage/"
@@ -307,14 +316,13 @@ _build-archive command goos goarch:
       )
     else
       files=("$binary" LICENSE THIRD_PARTY_NOTICES.md)
-      if [[ "$command" == "devopsh" ]]; then files+=(devopsh-mcp2cli MCP2CLI_LICENSE); fi
+      if [[ "$command" == "devopsh" ]]; then files+=(MCP2CLI_LICENSE); fi
       tar -C "$stage" -czf "${output_dir}/${archive_base}.tar.gz" "${files[@]}"
     fi
     rm "${stage}/${binary}"
     rm "${stage}/LICENSE"
     rm "${stage}/THIRD_PARTY_NOTICES.md"
     if [[ "$command" == "devopsh" ]]; then
-      rm "${stage}/devopsh-mcp2cli"
       rm "${stage}/MCP2CLI_LICENSE"
     fi
     rmdir "$stage"

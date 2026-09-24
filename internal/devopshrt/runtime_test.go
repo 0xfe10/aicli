@@ -1,6 +1,10 @@
 package devopshrt
 
 import (
+	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,59 +16,54 @@ import (
 func TestRuntimePathPrefersExplicitOverride(t *testing.T) {
 	want := filepath.Join(t.TempDir(), "mcp2cli")
 	t.Setenv("DEVOPSH_MCP2CLI", want)
-	got, err := runtimePath("devopsh", "devopsh")
+	got, err := runtimePath(t.TempDir())
 	if err != nil || got != want {
 		t.Fatalf("runtimePath() = %q, %v", got, err)
 	}
 }
 
-func TestRuntimePathFindsSibling(t *testing.T) {
-	dir := t.TempDir()
-	devopsh := filepath.Join(dir, "devopsh")
-	runtime := filepath.Join(dir, "devopsh-mcp2cli")
-	if err := os.WriteFile(devopsh, nil, 0o700); err != nil {
+func TestRuntimePathExtractsAndReusesEmbeddedRuntime(t *testing.T) {
+	payload := []byte("embedded runtime")
+	var compressed bytes.Buffer
+	writer := gzip.NewWriter(&compressed)
+	if _, err := writer.Write(payload); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(runtime, nil, 0o700); err != nil {
+	if err := writer.Close(); err != nil {
 		t.Fatal(err)
 	}
-	wrongDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(wrongDir, "mcp2cli"), nil, 0o700); err != nil {
-		t.Fatal(err)
-	}
+	oldRuntime, oldSHA := embeddedRuntime, runtimeSHA256
+	t.Cleanup(func() { embeddedRuntime, runtimeSHA256 = oldRuntime, oldSHA })
+	embeddedRuntime = compressed.Bytes()
+	runtimeSHA256 = fmt.Sprintf("%x", sha256.Sum256(payload))
 	t.Setenv("DEVOPSH_MCP2CLI", "")
-	t.Setenv("PATH", wrongDir)
-	got, err := runtimePath(devopsh, devopsh)
-	if err != nil || got != runtime {
-		t.Fatalf("runtimePath() = %q, %v", got, err)
-	}
-}
 
-func TestRuntimePathFindsShimSibling(t *testing.T) {
-	root := t.TempDir()
-	shimDir, releaseDir := filepath.Join(root, "shims"), filepath.Join(root, "release")
-	if err := os.MkdirAll(shimDir, 0o700); err != nil {
+	path, err := runtimePath(t.TempDir())
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(releaseDir, 0o700); err != nil {
+	data, err := os.ReadFile(path)
+	if err != nil {
 		t.Fatal(err)
 	}
-	realDevopsh := filepath.Join(releaseDir, "devopsh")
-	if err := os.WriteFile(realDevopsh, nil, 0o700); err != nil {
+	if !bytes.Equal(data, payload) {
+		t.Fatalf("runtime = %q", data)
+	}
+	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o700 {
+		t.Fatalf("runtime mode = %v, %v", info, err)
+	}
+	if again, err := runtimePath(filepath.Dir(filepath.Dir(path))); err != nil || again != path {
+		t.Fatalf("runtimePath reuse = %q, %v", again, err)
+	}
+
+	if err := os.WriteFile(path, []byte("corrupt"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	shim := filepath.Join(shimDir, "devopsh")
-	if err := os.Symlink(realDevopsh, shim); err != nil {
-		t.Fatal(err)
+	if repaired, err := runtimePath(filepath.Dir(filepath.Dir(path))); err != nil || repaired != path {
+		t.Fatalf("runtimePath repair = %q, %v", repaired, err)
 	}
-	want := filepath.Join(shimDir, "devopsh-mcp2cli")
-	if err := os.WriteFile(want, nil, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("DEVOPSH_MCP2CLI", "")
-	got, err := runtimePath(shim, realDevopsh)
-	if err != nil || got != want {
-		t.Fatalf("runtimePath() = %q, %v", got, err)
+	if data, err := os.ReadFile(path); err != nil || !bytes.Equal(data, payload) {
+		t.Fatalf("repaired runtime = %q, %v", data, err)
 	}
 }
 

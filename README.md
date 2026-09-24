@@ -212,7 +212,7 @@ devopsh --context production auth login
 ```
 
 Bearer tokens and discovery caches are isolated per context. Release archives
-contain both `devopsh` and its pinned `devopsh-mcp2cli` runtime.
+contain one `devopsh` executable; its pinned MCP runtime is embedded.
 
 ## Build and verify
 
