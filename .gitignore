@@ -4,6 +4,7 @@ npm-debug.log*
 
 bin/
 dist/
+internal/devopshrt/runtime.gz
 *.test
 coverage.out
 *.sha256
