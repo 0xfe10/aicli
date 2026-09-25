@@ -26,10 +26,10 @@ func main() {
 
 func exit(err error) {
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
 		if exit, ok := err.(interface{ ExitCode() int }); ok {
 			os.Exit(exit.ExitCode())
 		}
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
