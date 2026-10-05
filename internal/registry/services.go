@@ -9,6 +9,7 @@ type Service struct {
 
 func Services() []Service {
 	return []Service{
+		{ID: "itsaplan", Name: "It's a Plan", Status: "active", Command: "itsaplan"},
 		{
 			ID:      "pingcode",
 			Name:    "PingCode",

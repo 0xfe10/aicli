@@ -88,6 +88,7 @@ jobs:
           - aicli
           - pingcode
           - fns
+          - itsaplan
           - ozon
           - lanhu
           - devopsh
