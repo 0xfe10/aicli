@@ -187,8 +187,8 @@ release-checksums: _validate-version
     set -euo pipefail
     cd "{{ out_dir }}"
     archive_count="$(find . -maxdepth 1 -type f \( -name '*_{{ version }}_*.tar.gz' -o -name '*_{{ version }}_*.zip' \) | wc -l)"
-    if [[ "$archive_count" -ne 34 ]]; then
-      echo "expected 34 release archives, found ${archive_count}" >&2
+    if [[ "$archive_count" -ne 40 ]]; then
+      echo "expected 40 release archives, found ${archive_count}" >&2
       exit 1
     fi
     sha256sum ./*_"{{ version }}"_*.tar.gz ./*_"{{ version }}"_*.zip > checksums.txt
