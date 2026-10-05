@@ -28,8 +28,11 @@ func TestParseReferenceAndPages(t *testing.T) {
 }
 
 func TestRenderWithInstalledChromium(t *testing.T) {
-	chromium := ""
-	for _, candidate := range []string{"chromium", "chromium-browser", "google-chrome"} {
+	chromium := os.Getenv("LANHU_CHROMIUM")
+	for _, candidate := range []string{"google-chrome", "chromium", "chromium-browser"} {
+		if chromium != "" {
+			break
+		}
 		if path, err := exec.LookPath(candidate); err == nil {
 			chromium = path
 			break
