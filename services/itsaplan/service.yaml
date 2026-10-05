@@ -1,0 +1,21 @@
+id: itsaplan
+name: It's a Plan
+status: active
+implementation:
+  type: go-command
+  package: ./cmd/itsaplan
+  command: itsaplan
+  transport: embedded-restish-v2.3.0
+  api_description: "<selected-base-url>/docs/json"
+  api_description_format: openapi-3.0
+authentication:
+  supported: [personal-api-key]
+  header: x-api-key
+  local_commands: [auth login --mode key, auth status, auth logout]
+  config_path: $XDG_CONFIG_HOME/aicli/itsaplan/config.toml
+  environment_override: true
+safety:
+  write_mode_default: readonly
+notes:
+  - SCIM and Git webhook receiver operations use separate credentials and are excluded.
+  - API origin defaults to https://its-api.kahub.in and is configurable per context.

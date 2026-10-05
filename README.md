@@ -232,3 +232,41 @@ just build
 
 Release binaries are static (`CGO_ENABLED=0`) and built with stripped symbols.
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for embedded dependency notices.
+
+## It's a Plan (`itsaplan`)
+
+The CLI generates commands from the selected instance's OpenAPI JSON at
+`<base-url>/docs/json`. The default API origin is `https://its-api.kahub.in`.
+Personal API keys inherit their owner's permissions; create one in Account → API Keys.
+
+```sh
+itsaplan auth login --mode key  # prompts for API origin, then hidden API key
+itsaplan auth status
+itsaplan --help
+itsaplan projects --help
+itsaplan projects get-projects -o json
+itsaplan --context staging auth login --mode key
+```
+
+Config is stored at `$XDG_CONFIG_HOME/aicli/itsaplan/config.toml` with mode `0600`
+(directory `0700`). Named contexts isolate credentials and caches. Environment
+variables override file settings without changing the file:
+
+- `ITSAPLAN_BASE_URL`: API origin (not the frontend URL; no path prefix).
+- `ITSAPLAN_API_KEY`: personal API key, sent only to the configured API origin in `x-api-key`.
+- `ITSAPLAN_SPEC_URL`: optional alternative OpenAPI JSON URL; discovery sends no API key.
+- `ITSAPLAN_CONTEXT`: account context; overridden by `--context`.
+- `ITSAPLAN_WRITE_MODE`: `readonly` (default), `write`, or `destructive`.
+
+`write` permits POST/PUT/PATCH; DELETE and paths containing the exact segments
+`delete`, `purge`, `clear`, or `revoke` require `destructive` even when using POST.
+These are real requests, not dry runs. The guard covers generated and raw API
+requests. Git webhook receivers and SCIM operations require separate credentials
+and are excluded. Public API operations use the same auth/safety handler.
+Authenticated response caching is disabled. External OpenAPI references are rejected.
+
+```sh
+just test-itsaplan
+just itsaplan-spec-check
+just build-itsaplan
+```

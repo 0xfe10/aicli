@@ -1,0 +1,17 @@
+surface:
+  source: "<selected-base-url>/docs/json"
+  generation: runtime
+  layout: tags
+  naming: upstream-operation-id
+  coverage: personal-api-key-and-public-operations
+support_commands:
+  namespace: itsaplan cli
+  auth: [auth login --mode key, auth status, auth logout]
+  context: [context current, context list, context use]
+write_policy:
+  environment: ITSAPLAN_WRITE_MODE
+  default: readonly
+  write: permits POST, PUT, PATCH except destructive paths
+  destructive: also permits DELETE and delete/purge/clear/revoke path operations
+output:
+  owner: restish
