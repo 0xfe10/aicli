@@ -345,28 +345,46 @@ func insertSchema(root map[string]any, path []string, value map[string]any, requ
 func schemaForField(field apiDocField) (map[string]any, error) {
 	typ := strings.ToLower(strings.TrimSpace(field.Type))
 	var schema map[string]any
-	switch typ {
-	case "string", "sting":
-		schema = map[string]any{"type": "string"}
-	case "number":
-		schema = map[string]any{"type": "number"}
-	case "boolean":
-		schema = map[string]any{"type": "boolean"}
-	case "object":
-		schema = map[string]any{"type": "object", "additionalProperties": true}
-	case "object/string":
-		schema = map[string]any{"oneOf": []any{
-			map[string]any{"type": "object", "additionalProperties": true},
-			map[string]any{"type": "string"},
-		}}
-	case "string[]":
-		schema = map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
-	case "object[]":
-		schema = map[string]any{"type": "array", "items": map[string]any{"type": "object", "additionalProperties": true}}
-	case "file":
-		schema = map[string]any{"type": "string", "format": "binary"}
-	default:
-		return nil, fmt.Errorf("field %q has unsupported type %q", field.Field, field.Type)
+	if typ != "object/string" && strings.ContainsAny(typ, "|/") {
+		alternatives := strings.FieldsFunc(typ, func(r rune) bool { return r == '|' || r == '/' })
+		if len(alternatives) < 2 {
+			return nil, fmt.Errorf("field %q has unsupported type %q", field.Field, field.Type)
+		}
+		variants := make([]any, 0, len(alternatives))
+		for _, alternative := range alternatives {
+			variant, err := schemaForField(apiDocField{Type: alternative, Field: field.Field})
+			if err != nil {
+				return nil, err
+			}
+			variants = append(variants, variant)
+		}
+		schema = map[string]any{"anyOf": variants}
+	} else {
+		switch typ {
+		case "string", "sting":
+			schema = map[string]any{"type": "string"}
+		case "number":
+			schema = map[string]any{"type": "number"}
+		case "boolean":
+			schema = map[string]any{"type": "boolean"}
+		case "object":
+			schema = map[string]any{"type": "object", "additionalProperties": true}
+		case "object/string":
+			schema = map[string]any{"oneOf": []any{
+				map[string]any{"type": "object", "additionalProperties": true},
+				map[string]any{"type": "string"},
+			}}
+		case "array":
+			schema = map[string]any{"type": "array", "items": map[string]any{}}
+		case "string[]":
+			schema = map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
+		case "object[]":
+			schema = map[string]any{"type": "array", "items": map[string]any{"type": "object", "additionalProperties": true}}
+		case "file":
+			schema = map[string]any{"type": "string", "format": "binary"}
+		default:
+			return nil, fmt.Errorf("field %q has unsupported type %q", field.Field, field.Type)
+		}
 	}
 	if description := plainText(field.Description); description != "" {
 		schema["description"] = description

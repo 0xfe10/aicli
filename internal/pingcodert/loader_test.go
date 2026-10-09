@@ -126,3 +126,22 @@ func TestOfficialAPIDocFile(t *testing.T) {
 		t.Fatalf("generated operations = %d, want at least 450", operations)
 	}
 }
+
+func TestSchemaForOfficialUnionTypes(t *testing.T) {
+	for _, typ := range []string{"String|Number|Boolean|Object|Array", "String/Number/String[]/Object[]"} {
+		schema, err := schemaForField(apiDocField{Type: typ, Field: "value", Description: "description"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		alternatives, ok := schema["anyOf"].([]any)
+		if !ok || len(alternatives) < 2 {
+			t.Fatalf("missing union for %s: %#v", typ, schema)
+		}
+		if schema["description"] != "description" {
+			t.Fatal("union description missing")
+		}
+	}
+	if _, err := schemaForField(apiDocField{Type: "String|Mystery", Field: "value"}); err == nil {
+		t.Fatal("unknown union alternative accepted")
+	}
+}
