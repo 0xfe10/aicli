@@ -8,7 +8,7 @@ their release archive. Users install one command per service.
 
 ## Structure
 
-- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`, `ozon`, `lanhu`, `devopsh`, `itsaplan`, `paseo-bridge`).
+- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`, `ozon`, `lanhu`, `devopsh`, `itsaplan`, `paseo-bridge`, `hast`).
 - `internal/pingcodert/` adapts PingCode's API description and authentication to Restish.
 - `internal/swagger2rt/` converts Swagger / OpenAPI 2 documents to OpenAPI 3 for Restish.
 - `internal/fnsrt/` adapts Fast Note Sync (FNS) specs, auth, and write safety to Restish.
@@ -16,6 +16,7 @@ their release archive. Users install one command per service.
 - `internal/lanhurt/` provides the observed Lanhu API, Cookie auth, design workflows, and Axure rendering.
 - `internal/devopshrt/` binds DevOpsH to the packaged mcp2cli runtime.
 - `internal/paseobridgert/` binds Paseo Bridge OpenAPI 3.1, scoped Bearer auth, and send safety to Restish.
+- `internal/hastrt/` converts Hast Task Agent Swagger, adapts Bearer key authentication, and guards writes.
 - `internal/cli/` contains JSON helpers used by the `aicli` registry command.
 - `services/` contains service registrations and command-surface metadata.
 - `openwiki/` contains repository knowledge and architecture decisions.
@@ -322,4 +323,62 @@ are rejected. Documentation and browser assets are excluded from generated comma
 just test-paseo-bridge
 just paseo-bridge-spec-check
 just build-paseo-bridge
+```
+
+## Hast Task Agent (`hast`)
+
+The CLI generates all 39 published operations from
+[Hast's Swagger 2.0 contract](https://hast.so/openapi/task-agent.json), following the
+[Task API quickstart](https://hast.so/zh-CN/docs/task-api-quickstart). The default
+API origin is `https://backend.hast.so`. Personal API keys are sent as Bearer
+credentials; `prompts:write` submits tasks and `sessions:read` reads sessions/events.
+Other endpoints require their corresponding scopes; WeChat setup requires a
+Profile key with `channels:write`.
+
+```sh
+hast auth login --mode key  # prompts for API origin, then hidden personal API key
+hast auth status
+hast public-task-agents --help
+hast public-task-agents get-api-public-v1-sessions --limit 50 -o json
+hast public-task-agents get-api-public-v1-sessions-id SESSION_ID -o json
+
+# A real task submission, using a new request_id for each new turn.
+HAST_WRITE_MODE=write hast public-task-agents post-api-public-v1-prompts 'request_id: req_123, prompt: Summarize the latest workspace files.' -o json
+hast public-task-agents get-api-public-v1-sessions-id-events-stream SESSION_ID --after 0 -o ndjson
+
+# Multipart upload and binary download require a workspace file_id for retrieval.
+HAST_WRITE_MODE=write hast public-task-agents post-api-public-v1-files 'file: @./input.txt' -o json
+hast public-task-agents get-api-public-v1-files-relativepath input.txt FILE_ID --session-id SESSION_ID > input.txt
+hast public-task-agents get-api-public-v1-files-zip --session-id SESSION_ID > workspace.zip
+```
+
+HTTP 202 means accepted. Save the returned `session_id` and inspect run events
+for task completion; `message.completed` is only one message. SSE uses one
+connection. Reconnect with the last durable sequence via `--after SEQUENCE` or
+`-H 'Last-Event-ID: SEQUENCE'`; `--rsh-max-items N` limits events. Persisted events
+can also be fetched using `get-api-public-v1-sessions-id-events --after SEQUENCE`.
+A repeated `request_id` is idempotent according to Hast; use a fresh ID for a new
+turn. The CLI never automatically retries writes, including auth retries and
+307/308 body replays, even with Restish unsafe-retry overrides.
+
+Environment variables override local config without rewriting it:
+
+- `HAST_API_KEY`: personal API key (sent as `Authorization: Bearer`).
+- `HAST_API_BASE`: documented API root, e.g. `https://backend.hast.so/api/public/v1`.
+- `HAST_BASE_URL`: optional API origin override; takes precedence over `HAST_API_BASE`.
+- `HAST_SPEC_URL`: optional alternate Swagger JSON URL; discovery sends no key.
+- `HAST_CONTEXT`: selected account context; `--context NAME` takes precedence.
+- `HAST_WRITE_MODE`: `readonly` (default), `write`, or `destructive` (also permits DELETE).
+
+Config lives at `$XDG_CONFIG_HOME/aicli/hast/config.toml` with mode `0600`
+(directory `0700`). Named contexts isolate credentials and caches. Discovery
+rejects external references and ignores upstream server origins. Authenticated
+response caching is disabled and `--rsh-config` is ignored. User Secret endpoints
+return metadata only; keep business secret request bodies in protected input files
+rather than command history.
+
+```sh
+just test-hast
+just hast-spec-check
+just build-hast
 ```
