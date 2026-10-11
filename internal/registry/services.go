@@ -36,11 +36,5 @@ func Services() []Service {
 			Status:  "experimental",
 			Command: "lanhu",
 		},
-		{
-			ID:      "devopsh",
-			Name:    "DevOpsH",
-			Status:  "experimental",
-			Command: "devopsh",
-		},
 	}
 }

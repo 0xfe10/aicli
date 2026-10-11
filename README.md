@@ -8,16 +8,15 @@ their release archive. Users install one command per service.
 
 ## Structure
 
-- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`, `ozon`, `lanhu`, `devopsh`, `itsaplan`, `paseo-bridge`, `hast`).
+- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`, `ozon`, `lanhu`, `itsaplan`, `paseo-bridge`, `hast`).
 - `internal/pingcodert/` adapts PingCode's API description and authentication to Restish.
 - `internal/swagger2rt/` converts Swagger / OpenAPI 2 documents to OpenAPI 3 for Restish.
 - `internal/fnsrt/` adapts Fast Note Sync (FNS) specs, auth, and write safety to Restish.
 - `internal/ozonrt/` repairs the Ozon Seller OpenAPI and applies header auth and operation-level write safety.
 - `internal/lanhurt/` provides the observed Lanhu API, Cookie auth, design workflows, and Axure rendering.
-- `internal/devopshrt/` binds DevOpsH to the packaged mcp2cli runtime.
 - `internal/paseobridgert/` binds Paseo Bridge OpenAPI 3.1, scoped Bearer auth, and send safety to Restish.
 - `internal/hastrt/` exposes Hast MCP tools, resources and prompts with Bearer auth and write guards.
-- `internal/mcp2clirt/` extracts the pinned MCP runtime shared by Hast and DevOpsH.
+- `internal/mcp2clirt/` extracts the pinned MCP runtime used by Hast.
 - `internal/cli/` contains JSON helpers used by the `aicli` registry command.
 - `services/` contains service registrations and command-surface metadata.
 - `openwiki/` contains repository knowledge and architecture decisions.
@@ -204,19 +203,6 @@ binary when needed. Root-only containers may explicitly set
 attached only to the exact Lanhu and DDS API
 origins, never to signed CDN or OSS downloads.
 
-## DevOpsH (`devopsh`)
-
-```sh
-devopsh auth login
-devopsh ls
-devopsh --help
-devopsh context use staging
-devopsh --context production auth login
-```
-
-Bearer tokens and discovery caches are isolated per context. Release archives
-contain one `devopsh` executable; its pinned MCP runtime is embedded.
-
 ## Build and verify
 
 ```sh
@@ -224,7 +210,6 @@ just verify
 just test-fns
 just test-ozon
 just test-lanhu
-just test-devopsh
 just fns-spec-check
 just ozon-spec-check
 just verify-fns

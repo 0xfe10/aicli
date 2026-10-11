@@ -110,9 +110,6 @@ test-ozon:
 test-lanhu:
     go test ./internal/lanhurt ./cmd/lanhu
 
-test-devopsh:
-    go test ./internal/devopshrt ./cmd/devopsh
-
 build-fns: _validate-version
     @just _build-fns linux amd64
     @just _build-fns linux arm64
@@ -165,10 +162,6 @@ release-build: _validate-version
     @just build-archive lanhu darwin arm64
     @just build-archive lanhu windows amd64
     @just build-archive lanhu windows arm64
-    @just build-archive devopsh linux amd64
-    @just build-archive devopsh linux arm64
-    @just build-archive devopsh darwin amd64
-    @just build-archive devopsh darwin arm64
     @just build-archive itsaplan linux amd64
     @just build-archive itsaplan linux arm64
     @just build-archive itsaplan darwin amd64
@@ -287,7 +280,7 @@ _build-archive command goos goarch:
 
     stage="$(mktemp -d)"
     echo "building ${archive_base}"
-    if [[ "$command" == "devopsh" || "$command" == "hast" ]]; then
+    if [[ "$command" == "hast" ]]; then
       case "${goos}/${goarch}" in
         linux/amd64) target=x86_64-unknown-linux-musl; expected=a0e53b0685638b0263415fa891d5884f52419b24579dc513fd2db1c11327735e ;;
         linux/arm64) target=aarch64-unknown-linux-musl; expected=0fd984d7398d1d6db8b583d63a33dbdfaab3c928c59848299addfdfd50121b6c ;;
@@ -332,13 +325,13 @@ _build-archive command goos goarch:
       )
     else
       files=("$binary" LICENSE THIRD_PARTY_NOTICES.md)
-      if [[ "$command" == "devopsh" || "$command" == "hast" ]]; then files+=(MCP2CLI_LICENSE); fi
+      if [[ "$command" == "hast" ]]; then files+=(MCP2CLI_LICENSE); fi
       tar -C "$stage" -czf "${output_dir}/${archive_base}.tar.gz" "${files[@]}"
     fi
     rm "${stage}/${binary}"
     rm "${stage}/LICENSE"
     rm "${stage}/THIRD_PARTY_NOTICES.md"
-    if [[ "$command" == "devopsh" || "$command" == "hast" ]]; then
+    if [[ "$command" == "hast" ]]; then
       rm "${stage}/MCP2CLI_LICENSE"
     fi
     rmdir "$stage"
