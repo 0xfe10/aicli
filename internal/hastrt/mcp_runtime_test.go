@@ -19,6 +19,12 @@ func TestMCPArgumentsAndErrorOutput(t *testing.T) {
 			t.Fatalf("override accepted: %s", flag)
 		}
 	}
+	if !mcpResultFailed([]byte(`{"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"invalid parameters"}}`)) {
+		t.Fatal("JSON-RPC error treated as success")
+	}
+	if mcpResultFailed([]byte(`{"body":{"error":"business data"}}`)) {
+		t.Fatal("business field treated as protocol error")
+	}
 	raw := []byte(`{"data":{"result":{"isError":true,"structuredContent":{"status":404,"body":{"error":"missing"}}}}}`)
 	if !mcpResultFailed(raw) {
 		t.Fatal("tool error treated as success")
@@ -167,5 +173,28 @@ func TestNativeMCPRuntime(t *testing.T) {
 	}
 	if writes.Load() != 2 {
 		t.Fatal("delete missing/replayed")
+	}
+}
+
+func TestMCPRuntimeKeepsCredentialsOutOfChildEnvironment(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("HAST_API_KEY", "private-test-key")
+	t.Setenv("hast_api_key", "alternate-private-key")
+	t.Setenv("HAST_BASE_URL", "http://127.0.0.1:12345")
+	t.Setenv("HAST_WRITE_MODE", "readonly")
+	t.Setenv("MCP2CLI_SERVER__ENDPOINT", "https://wrong.test/mcp")
+	script := filepath.Join(t.TempDir(), "runtime")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nif [ -n \"$HAST_API_KEY\" ] || [ -n \"$hast_api_key\" ] || [ -n \"$MCP2CLI_SERVER__ENDPOINT\" ]; then exit 7; fi\nprintf '%s\\n' '{\"data\":{\"result\":{\"structuredContent\":{\"status\":200,\"body\":{}}}}}'\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HAST_MCP2CLI", script)
+	selection := ContextManager().DefaultSelection()
+	if err := ContextManager().Prepare(selection); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := runMCP([]string{"hast", "get_models"}, selection, "test", "test", &output, &output); err != nil {
+		t.Fatal(err)
 	}
 }

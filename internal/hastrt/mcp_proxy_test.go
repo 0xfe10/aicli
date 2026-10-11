@@ -98,3 +98,33 @@ func TestMCPProxyNoWriteRedirect(t *testing.T) {
 		upstream.Close()
 	}
 }
+
+func TestMCPProxyProtocolErrors(t *testing.T) {
+	for _, stream := range []bool{false, true} {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			data := `{"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"invalid parameters"}}`
+			if stream {
+				w.Header().Set("Content-Type", "text/event-stream")
+				fmt.Fprint(w, "event: message\ndata: "+data+"\n\n")
+			} else {
+				w.Header().Set("Content-Type", "application/json")
+				fmt.Fprint(w, data)
+			}
+		}))
+		p, err := NewMCPProxy(Session{BaseURL: upstream.URL, Credentials: Credentials{APIKey: "test"}}, "write")
+		if err != nil {
+			t.Fatal(err)
+		}
+		response, err := http.Post(p.Endpoint, "application/json", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"post_webhooks"}}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		io.Copy(io.Discard, response.Body)
+		response.Body.Close()
+		if p.Err() == nil {
+			t.Fatal("JSON-RPC error treated as success")
+		}
+		p.Close()
+		upstream.Close()
+	}
+}

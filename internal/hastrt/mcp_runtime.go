@@ -91,7 +91,7 @@ func runMCP(args []string, selection contextflow.Selection, version, commit stri
 	cmd.Stdout, cmd.Stderr = &out, &diagnostic
 	env := make([]string, 0, len(os.Environ()))
 	for _, value := range os.Environ() {
-		if !strings.HasPrefix(strings.ToUpper(value), "MCP2CLI_") && !strings.HasPrefix(value, "HAST_API_KEY=") {
+		if !strings.HasPrefix(strings.ToUpper(value), "MCP2CLI_") && !strings.HasPrefix(strings.ToUpper(value), "HAST_API_KEY=") {
 			env = append(env, value)
 		}
 	}
@@ -163,6 +163,9 @@ func mcpResultFailed(raw []byte) bool {
 	failed = func(v interface{}) bool {
 		switch x := v.(type) {
 		case map[string]interface{}:
+			if x["jsonrpc"] == "2.0" && x["error"] != nil {
+				return true
+			}
 			if x["isError"] == true {
 				return true
 			}
