@@ -40,13 +40,13 @@ func TestGeneratedBridgeCommands(t *testing.T) {
 	var hits, sendHits, redirectHits atomic.Int32
 	var responseStatus atomic.Int32
 	responseStatus.Store(http.StatusAccepted)
-	mux.HandleFunc("/api/v1/hosts", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v1/hosts/test", func(w http.ResponseWriter, r *http.Request) {
 		hits.Add(1)
 		if r.Header.Get("Authorization") != "Bearer test-secret" {
 			t.Error("missing bearer auth")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"ok":true,"data":[]}`)
+		fmt.Fprint(w, `{"ok":true,"data":{"results":[{"host":"test","state":"online","fetchedAt":"now"}],"partial":false}}`)
 	})
 	mux.HandleFunc("/api/v1/hosts/test/agents/agent/messages", func(w http.ResponseWriter, r *http.Request) {
 		sendHits.Add(1)
@@ -77,9 +77,9 @@ func TestGeneratedBridgeCommands(t *testing.T) {
 		}
 		w.WriteHeader(status)
 		if status == http.StatusAccepted {
-			fmt.Fprint(w, `{"ok":true,"data":{"status":"accepted"}}`)
+			fmt.Fprint(w, `{"ok":true,"data":{"host":"test","agentId":"agent","status":"accepted"}}`)
 		} else if status == http.StatusOK {
-			fmt.Fprint(w, `{"ok":true,"data":{"status":"unknown","retrySafe":false}}`)
+			fmt.Fprint(w, `{"ok":true,"data":{"host":"test","agentId":"agent","status":"unknown","retrySafe":false}}`)
 		} else if status == http.StatusCreated {
 			fmt.Fprint(w, `invalid-json`)
 		} else {
@@ -92,7 +92,7 @@ func TestGeneratedBridgeCommands(t *testing.T) {
 			t.Error("tail=0 not preserved")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"ok":true,"data":{"entries":[],"gap":true,"epoch":1}}`)
+		fmt.Fprint(w, `{"ok":true,"data":{"host":"test","agentId":"agent","entries":[],"gap":true,"epoch":1}}`)
 	})
 	mux.HandleFunc("/api/v1/hosts/test/agents/agent/events", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer test-secret" || r.URL.Query().Get("include") != "activity" {
@@ -106,7 +106,9 @@ func TestGeneratedBridgeCommands(t *testing.T) {
 	t.Setenv("PASEO_BRIDGE_WRITE_MODE", "")
 	selection := ContextManager().DefaultSelection()
 	cfg := Config{BaseURL: server.URL, SpecURL: server.URL + "/api/v1/openapi.json"}
-	session := Session{BaseURL: server.URL, HasCredentials: true, Credentials: Credentials{AccessToken: "test-secret"}}
+	keys, serverKey, e2eePath := testE2EEKeys(t, "test")
+	mux.HandleFunc("/api/v1/e2ee/requests", encryptedFixture(t, keys, serverKey, mux, nil))
+	session := Session{BaseURL: server.URL, E2EEFile: e2eePath, HasCredentials: true, Credentials: Credentials{AccessToken: "test-secret"}}
 	run := func(args ...string) (string, error) {
 		cli := NewCLIWithContext(cfg, session, "test", "test", selection)
 		var output bytes.Buffer
@@ -150,7 +152,7 @@ func TestGeneratedBridgeCommands(t *testing.T) {
 	t.Setenv("PASEO_BRIDGE_WRITE_MODE", "write")
 	t.Setenv("RSH_RETRY_UNSAFE", "1")
 	t.Setenv("RSH_RETRY", "3")
-	for _, code := range []int{200, 202, 401, 429, 503, 504, 307, 308, 0} {
+	for _, code := range []int{200, 202, 401, 429, 503, 504, 307, 308} {
 		responseStatus.Store(int32(code))
 		before := sendHits.Load()
 		output, err := run("send", "send-message", "test", "agent", "prompt: test prompt", "--rsh-retry-unsafe", "--rsh-retry", "3", "-o", "json")

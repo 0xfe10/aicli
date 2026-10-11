@@ -4,8 +4,10 @@ package paseobridgert
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/0xfe10/aicli/internal/authflow"
 	"github.com/0xfe10/aicli/internal/contextflow"
@@ -21,12 +23,16 @@ const (
 	securitySchemeName = "bridgeBearer"
 )
 
+var cliSessions sync.Map
+
 type Config struct{ BaseURL, SpecURL string }
 type Session struct {
 	BaseURL, BaseURLSource string
 	Credentials            Credentials
 	HasCredentials         bool
 	CredentialSource       string
+	E2EEFile               string
+	SpecURL                string
 }
 
 func LoadSessionWithContext(selection contextflow.Selection) (Session, Config, error) {
@@ -47,7 +53,11 @@ func LoadSessionWithContext(selection contextflow.Selection) (Session, Config, e
 	if err := validateOrigin(base); err != nil {
 		return Session{}, Config{}, err
 	}
-	session := Session{BaseURL: base, BaseURLSource: source}
+	e2eeFile := strings.TrimSpace(os.Getenv("PASEO_BRIDGE_E2EE_FILE"))
+	if e2eeFile == "" {
+		e2eeFile = file.E2EEFile
+	}
+	session := Session{BaseURL: base, BaseURLSource: source, E2EEFile: e2eeFile}
 	if creds, ok := credentialsFromSnapshot(file, env); ok {
 		session.Credentials = creds
 		session.HasCredentials = true
@@ -76,6 +86,8 @@ func NewCLIWithContext(cfg Config, session Session, version, commit string, sele
 	cli.SetCommandSurface(restish.CommandSurface{PromotedAPI: "paseo-bridge", SupportCommandNamespace: "cli"})
 	cli.AddLoader(SpecLoader{})
 	cli.AddAuthHandler(AuthType, &HeaderAuth{Session: session})
+	session.SpecURL = cfg.SpecURL
+	cliSessions.Store(cli, session)
 	return cli
 }
 
@@ -92,6 +104,15 @@ func RunCLIWithContext(cli *restish.CLI, args []string, selection contextflow.Se
 		return err
 	}
 	defer restore()
+	value, ok := cliSessions.LoadAndDelete(cli)
+	if !ok {
+		return fmt.Errorf("PASEO_BRIDGE CLI session is unavailable")
+	}
+	session := value.(Session)
+	keys, keyErr := loadE2EE(session.E2EEFile)
+	originalTransport := http.DefaultTransport
+	http.DefaultTransport = &encryptedTransport{base: originalTransport, origin: session.BaseURL, specURL: session.SpecURL, keys: keys, configErr: keyErr}
+	defer func() { http.DefaultTransport = originalTransport }()
 	args, stripped := restishengine.FilterConfigFlags(args)
 	if stripped {
 		w := io.Writer(os.Stderr)

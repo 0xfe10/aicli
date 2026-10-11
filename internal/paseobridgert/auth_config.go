@@ -34,8 +34,9 @@ type AuthConfig struct {
 
 // FileConfig is the persisted PASEO_BRIDGE configuration file.
 type FileConfig struct {
-	BaseURL string      `toml:"base_url,omitempty"`
-	Auth    *AuthConfig `toml:"auth,omitempty"`
+	BaseURL  string      `toml:"base_url,omitempty"`
+	E2EEFile string      `toml:"e2ee_file,omitempty"`
+	Auth     *AuthConfig `toml:"auth,omitempty"`
 }
 
 // ConfigDir returns $XDG_CONFIG_HOME/aicli/paseo-bridge or ~/.config/aicli/paseo-bridge.
@@ -246,6 +247,9 @@ func rejectInsecureDir(path string, info os.FileInfo) error {
 	if !info.IsDir() {
 		return fmt.Errorf("PASEO_BRIDGE config path is not a directory: %s", path)
 	}
+	if !ownedByCurrentUser(info) {
+		return fmt.Errorf("PASEO_BRIDGE config must be owned by the current user: %s", path)
+	}
 	if permissionTooOpen(info.Mode(), groupOtherBits) {
 		return fmt.Errorf("PASEO_BRIDGE config directory permissions must be 0700 or stricter: %s", path)
 	}
@@ -258,6 +262,9 @@ func rejectInsecureFile(path string, info os.FileInfo) error {
 	}
 	if !info.Mode().IsRegular() {
 		return fmt.Errorf("PASEO_BRIDGE config must be a regular file: %s", path)
+	}
+	if !ownedByCurrentUser(info) {
+		return fmt.Errorf("PASEO_BRIDGE config must be owned by the current user: %s", path)
 	}
 	if permissionTooOpen(info.Mode(), groupOtherBits) {
 		return fmt.Errorf("PASEO_BRIDGE config permissions must be 0600 or stricter: %s", path)

@@ -298,8 +298,38 @@ Environment overrides do not rewrite configuration:
 - `PASEO_BRIDGE_BASE_URL`: API origin without a path prefix.
 - `PASEO_BRIDGE_ACCESS_TOKEN`: scoped bearer token.
 - `PASEO_BRIDGE_SPEC_URL`: optional alternate spec URL; discovery sends no token.
+- `PASEO_BRIDGE_E2EE_FILE`: absolute path to the protected E2EE configuration.
 - `PASEO_BRIDGE_CONTEXT`: selected account context.
 - `PASEO_BRIDGE_WRITE_MODE`: `readonly` (default), `write`, or `destructive`.
+
+Central business requests require E2EE. Existing token-only configurations must
+add `e2ee_file = "/absolute/path/e2ee.json"` at the top level of `config.toml`
+(or use `PASEO_BRIDGE_E2EE_FILE`). The JSON file is:
+
+```json
+{"version":1,"keyFile":"/absolute/path/client.key","hosts":{"aspen":"BASE64_RAW_X25519_PUBLIC_KEY","birch":"BASE64_RAW_X25519_PUBLIC_KEY"}}
+```
+
+The key file contains the standard base64 encoding of a 32-byte X25519 private
+key. Both files must be regular, owned by the current user, and mode `0600` or
+stricter. Windows binaries can run auth, documentation, and version commands,
+but E2EE business operations fail closed until Windows file ACL verification
+is implemented. Provision the client's SHA-256 public-key fingerprint in each host's
+allowlist, and verify host public keys through an independent trusted channel;
+never obtain pins from the central broker. Private keys stay on their owner.
+Requests fail closed when configuration, pins, or response authentication fail.
+There is no plaintext fallback. `host=all` queries fan out locally to pinned
+hosts and report per-host errors as partial results.
+
+The center sees routing metadata (host, client fingerprint, operation, request
+ID, expiry, frame sizes/timing) and bearer-token authorization, but cannot read
+paths, agent IDs, prompts, snapshots, or activity. Encrypted SSE is verified
+frame by frame; truncation is an error. Nonstreaming responses are exposed only
+after the authenticated end frame. Limits are 256 KiB per request body, 16 MiB
+per host response, and 150 seconds per encrypted operation. A failed send can
+still have been delivered: do not resend automatically. Static host/client keys
+do not provide forward secrecy; compromise requires key rotation and pin updates.
+OpenAPI discovery is public and is not encrypted.
 
 Branded CLI configuration ignores `--rsh-config`; authenticated response caching
 is disabled. External OpenAPI references and cross-origin credential attachment
