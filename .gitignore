@@ -4,7 +4,6 @@ npm-debug.log*
 
 bin/
 dist/
-internal/mcp2clirt/runtime.gz
 *.test
 coverage.out
 *.sha256

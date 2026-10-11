@@ -2,21 +2,18 @@
 
 `aicli` is a Go monorepo for AI-oriented service CLIs.
 
-OpenAPI service CLIs embed [Restish](https://rest.sh/) v2.3.0. MCP services use
-the pinned [mcp2cli](https://github.com/mcp2cli/source-code) runtime shipped in
-their release archive. Users install one command per service.
+OpenAPI service CLIs embed [Restish](https://rest.sh/) v2.3.0. Users install one
+command per service.
 
 ## Structure
 
-- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`, `ozon`, `lanhu`, `itsaplan`, `paseo-bridge`, `hast`).
+- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`, `ozon`, `lanhu`, `itsaplan`, `paseo-bridge`).
 - `internal/pingcodert/` adapts PingCode's API description and authentication to Restish.
 - `internal/swagger2rt/` converts Swagger / OpenAPI 2 documents to OpenAPI 3 for Restish.
 - `internal/fnsrt/` adapts Fast Note Sync (FNS) specs, auth, and write safety to Restish.
 - `internal/ozonrt/` repairs the Ozon Seller OpenAPI and applies header auth and operation-level write safety.
 - `internal/lanhurt/` provides the observed Lanhu API, Cookie auth, design workflows, and Axure rendering.
 - `internal/paseobridgert/` binds Paseo Bridge OpenAPI 3.1, scoped Bearer auth, and send safety to Restish.
-- `internal/hastrt/` exposes Hast MCP tools, resources and prompts with Bearer auth and write guards.
-- `internal/mcp2clirt/` extracts the pinned MCP runtime used by Hast.
 - `internal/cli/` contains JSON helpers used by the `aicli` registry command.
 - `services/` contains service registrations and command-surface metadata.
 - `openwiki/` contains repository knowledge and architecture decisions.
@@ -309,75 +306,4 @@ are rejected. Documentation and browser assets are excluded from generated comma
 just test-paseo-bridge
 just paseo-bridge-spec-check
 just build-paseo-bridge
-```
-
-## Hast AIP MCP (`hast`)
-
-`hast` discovers the tools, resources and prompts available to the selected key at
-`https://backend.hast.so/api/public/v1/mcp`, following the
-[MCP guide](https://hast.so/zh-CN/docs/mcp). Saved AIP Agents are represented by
-Webhooks; `post_webhooks` creates one. Tool availability depends on the key's
-Profile and scopes. Agent configuration requires `webhooks:read`; creating,
-updating and invoking Agents requires `webhooks:write`.
-
-Existing `hast auth` credentials and contexts remain valid. Login accepts an API
-origin such as `https://backend.hast.so`, then prompts for a hidden API key. Hast
-MCP uses Bearer keys and does not provide OAuth login.
-
-```sh
-hast auth login --mode key
-hast auth status
-hast context list
-hast --context work auth login --mode key
-hast ls
-hast --help
-hast get hast://guides/overview
-hast get hast://guides/enterprise-agent
-hast get_models --json
-hast get_webhooks --json
-hast get_sessions --args-json '{"query":{"limit":5}}' --json
-```
-
-Commands follow MCP tool names, including underscores. Pass the complete nested
-`path`, `query`, `body` or `upload` object with `--args-json` or `--args-file`;
-`--input-json` is for client elicitation, not the tool request body. For example,
-`agent.json` contains `{ "body": { "title": "degov", ... } }`, with model and
-policy values selected from `get_models` and `get_webhooks`:
-
-```sh
-HAST_WRITE_MODE=write hast post_webhooks --args-file agent.json --json
-hast get_webhooks_hook_id --args-json '{"path":{"hook_id":"HOOK_ID"}}' --json
-```
-
-`HAST_WRITE_MODE` defaults to `readonly`; `write` permits non-destructive writes,
-and `destructive` also permits deletions. Gates apply to typed tools and generic
-MCP calls. Failed MCP tools produce a nonzero exit code. Writes are not
-transparently replayed or redirected. HTTP 202 means accepted; follow paginated
-session events until the matching run reaches a terminal state.
-
-Environment variables:
-
-- `HAST_API_KEY`: overrides the stored Bearer key.
-- `HAST_BASE_URL`: overrides the API origin.
-- `HAST_API_BASE`: accepts the documented `/api/public/v1` suffix; `HAST_BASE_URL` takes precedence.
-- `HAST_CONTEXT`: selected account context; `--context NAME` takes precedence.
-- `HAST_WRITE_MODE`: `readonly`, `write` or `destructive`.
-
-Credentials remain at `$XDG_CONFIG_HOME/aicli/hast/config.toml`, mode `0600`.
-The runtime receives a local authenticated bridge address; the real key stays in
-the Go process. Discovery caches are isolated by context, origin and credential.
-Telemetry is disabled. `HAST_SPEC_URL` and Restish options no longer apply.
-Use `--json` for structured output. MCP file transfers use Base64; resources and
-prompts are discovered alongside tools.
-
-This is a command-surface change from v0.9.x: commands such as
-`hast public-task-agents get-api-public-v1-sessions` become `hast get_sessions`.
-Hast MCP release archives include the pinned mcp2cli 0.1.10 runtime and its
-license, for Linux/macOS amd64 and arm64. Windows releases are unavailable
-because this runtime version has no upstream Windows artifacts.
-
-```sh
-just test-hast
-just build-hast
-just hast-mcp-check
 ```
