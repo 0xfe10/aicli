@@ -24,7 +24,6 @@ type environmentSnapshot struct {
 	BaseURL string
 	APIBase string
 	APIKey  string
-	SpecURL string
 }
 
 func readEnvironmentSnapshot() environmentSnapshot {
@@ -32,7 +31,6 @@ func readEnvironmentSnapshot() environmentSnapshot {
 		BaseURL: strings.TrimSpace(os.Getenv("HAST_BASE_URL")),
 		APIBase: strings.TrimSpace(os.Getenv("HAST_API_BASE")),
 		APIKey:  strings.TrimSpace(os.Getenv("HAST_API_KEY")),
-		SpecURL: strings.TrimSpace(os.Getenv("HAST_SPEC_URL")),
 	}
 }
 

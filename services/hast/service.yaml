@@ -1,25 +1,25 @@
 id: hast
-name: Hast Task Agent
+name: Hast AIP
 status: active
 implementation:
-  type: go-command
+  type: mcp2cli-command
   package: ./cmd/hast
   command: hast
-  transport: embedded-restish-v2.3.0
-  api_description: https://hast.so/openapi/task-agent.json
-  api_description_format: swagger-2.0
+  runtime: mcp2cli@0.1.10
 authentication:
-  supported: [personal-api-key]
+  supported: [public-api-key]
   header: Authorization
   scheme: Bearer
   local_commands: [auth login --mode key, auth status, auth logout]
   config_path: $XDG_CONFIG_HOME/aicli/hast/config.toml
   environment_override: true
+surface:
+  source: https://backend.hast.so/api/public/v1/mcp
+  generation: runtime-mcp-discovery
 safety:
   write_mode_default: readonly
 notes:
-  - API origin defaults to https://backend.hast.so.
-  - HAST_API_BASE supports the documented /api/public/v1 suffix without duplicating paths.
-  - PublicBearer and PublicTaskAgentAPIKey refer to the same scoped key.
-  - Write requests are never automatically retried; 202 is acceptance, not completion.
-  - Profile-only channel operations and other scopes are enforced by the server.
+  - Existing auth configuration and contexts remain valid.
+  - MCP tools, resources and prompts reflect the selected key's Profile and scopes.
+  - The authenticated local bridge guards all tool calls, with no automatic write replay.
+  - Runtime artifacts support Linux and macOS amd64/arm64.

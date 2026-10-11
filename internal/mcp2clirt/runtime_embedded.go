@@ -1,6 +1,6 @@
 //go:build embedded_runtime
 
-package devopshrt
+package mcp2clirt
 
 import _ "embed"
 

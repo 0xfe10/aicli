@@ -1,5 +1,5 @@
 //go:build !embedded_runtime
 
-package devopshrt
+package mcp2clirt
 
 var embeddedRuntime []byte

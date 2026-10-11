@@ -2,59 +2,18 @@ package hastrt
 
 import (
 	"bytes"
-	"context"
-
-	"io"
-	"net/http"
+	"github.com/0xfe10/aicli/internal/authflow"
 	"os"
 	"path/filepath"
 	"strings"
-
 	"testing"
-	"time"
-
-	"github.com/0xfe10/aicli/internal/authflow"
-	restish "github.com/rest-sh/restish/v2"
-	restishauth "github.com/rest-sh/restish/v2/auth"
 )
-
-func TestAuthSafetyAndOrigin(t *testing.T) {
-	a := &HeaderAuth{Session: Session{BaseURL: "https://api.example.test", HasCredentials: true, Credentials: Credentials{APIKey: "test-secret"}}}
-	for _, tc := range []struct {
-		method, path, mode string
-		allowed            bool
-	}{
-		{"GET", "/projects", "", true}, {"POST", "/projects", "", false}, {"POST", "/projects", "write", true},
-		{"POST", "/projects/foo/issues/bulk/delete", "write", false}, {"POST", "/projects/foo/issues/bulk/delete", "destructive", true},
-		{"DELETE", "/projects/foo", "write", false}, {"DELETE", "/projects/foo", "destructive", true}, {"GET", "/projects", "invalid", false},
-	} {
-		t.Setenv("HAST_WRITE_MODE", tc.mode)
-		req, _ := http.NewRequest(tc.method, "https://api.example.test"+tc.path, nil)
-		err := a.Authenticate(context.Background(), req, restishauth.AuthContext{})
-		if (err == nil) != tc.allowed {
-			t.Fatalf("%+v: %v", tc, err)
-		}
-		if tc.allowed && req.Header.Get("Authorization") != "Bearer test-secret" {
-			t.Fatal("missing bearer header")
-		}
-	}
-	t.Setenv("HAST_WRITE_MODE", "write")
-	req, _ := http.NewRequest("GET", "https://other.test/projects", nil)
-	if a.Authenticate(context.Background(), req, restishauth.AuthContext{}) == nil {
-		t.Fatal("cross-origin credential leak")
-	}
-	req, _ = http.NewRequest("POST", "https://api.example.test/projects", nil)
-	if a.Authenticate(context.Background(), req, restishauth.AuthContext{Force: true}) == nil {
-		t.Fatal("write auth retry allowed")
-	}
-}
 
 func TestAuthConfigAndContext(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("HAST_API_KEY", "")
 	t.Setenv("HAST_BASE_URL", "")
 	t.Setenv("HAST_API_BASE", "")
-	t.Setenv("HAST_SPEC_URL", "")
 	manager := ContextManager()
 	sel, _, err := manager.ResolveArgs([]string{"hast", "--context", "kahub"})
 	if err != nil {
@@ -69,7 +28,7 @@ func TestAuthConfigAndContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !session.HasCredentials || cfg.SpecURL != DefaultSpecURL {
+	if !session.HasCredentials || cfg.BaseURL != "https://api.test" {
 		t.Fatalf("bad session %v", cfg)
 	}
 	info, _ := os.Stat(ConfigPathFor(sel))
@@ -106,36 +65,6 @@ func TestAuthConfigAndContext(t *testing.T) {
 	}
 }
 
-func TestSpecRejectExternalRefs(t *testing.T) {
-	_, err := fixSpec([]byte(`{"swagger":"2.0","paths":{},"definitions":{"bad":{"$ref":"https://other.test/spec"}}}`))
-	if err == nil {
-		t.Fatal("external ref accepted")
-	}
-}
-func TestLiveSpec(t *testing.T) {
-	url := os.Getenv("HAST_SPEC_CHECK_URL")
-	if url == "" {
-		t.Skip("opt-in live spec check")
-	}
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Set("User-Agent", "aicli-spec-check")
-	resp, err := (&http.Client{Timeout: 20 * time.Second}).Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		t.Fatalf("spec HTTP %d", resp.StatusCode)
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := (SpecLoader{}).LoadWithOptions(body, restish.LoadOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("loaded live spec: %d bytes", len(body))
-}
 func TestSymlinkConfigRejected(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")

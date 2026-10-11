@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/0xfe10/aicli/internal/contextflow"
 	"github.com/0xfe10/aicli/internal/hastrt"
@@ -41,18 +40,8 @@ func main() {
 		return
 	}
 
-	session, cfg, err := hastrt.LoadSessionWithContext(selection)
-	if err != nil {
+	if err := hastrt.RunMCPWithContext(args, selection, version, commit); err != nil {
 		fmt.Fprintln(os.Stderr, hastrt.RedactSecrets(err.Error()))
-		os.Exit(1)
-	}
-	cli := hastrt.NewCLIWithContext(cfg, session, version, commit, selection)
-	if err := hastrt.RunCLIWithContext(cli, args, selection); err != nil {
-		message := err.Error()
-		if session.Credentials.APIKey != "" {
-			message = strings.ReplaceAll(message, session.Credentials.APIKey, "***")
-		}
-		fmt.Fprintln(os.Stderr, hastrt.RedactSecrets(message))
 		os.Exit(1)
 	}
 }
