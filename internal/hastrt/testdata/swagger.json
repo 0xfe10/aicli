@@ -1,0 +1,3683 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Hast Task Agent API",
+    "version": "1.0"
+  },
+  "host": "backend.hast.so",
+  "basePath": "/",
+  "schemes": [
+    "https"
+  ],
+  "paths": {
+    "/api/public/v1/connectors/accounts": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentConnectorAccountListEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "List public connector accounts",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/connectors/accounts/{id}": {
+      "delete": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Connector account ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Connector account request",
+            "in": "body",
+            "name": "request",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentConnectorAccountRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentConnectorAccountEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Read, update, or delete a public connector account",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "get": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Connector account ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Connector account request",
+            "in": "body",
+            "name": "request",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentConnectorAccountRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentConnectorAccountEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Read, update, or delete a public connector account",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "patch": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Connector account ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Connector account request",
+            "in": "body",
+            "name": "request",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentConnectorAccountRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentConnectorAccountEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Read, update, or delete a public connector account",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "put": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Connector account ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Connector account request",
+            "in": "body",
+            "name": "request",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentConnectorAccountRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentConnectorAccountEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Read, update, or delete a public connector account",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/connectors/catalog": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentConnectorStatusEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "List public connector catalog",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/connectors/status": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentConnectorStatusEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "List public connector status",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/connectors/{provider}/oauth/authorize": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Connector provider",
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentConnectorStartEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Start public connector OAuth authorization",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/files": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Session ID",
+            "in": "query",
+            "name": "session_id",
+            "type": "string"
+          },
+          {
+            "description": "Workspace directory path",
+            "in": "query",
+            "name": "path",
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.PublicTaskAgentWorkspaceFilesEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "List, download, or delete public workspace files",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "post": {
+        "parameters": [
+          {
+            "description": "File",
+            "in": "formData",
+            "name": "file",
+            "required": true,
+            "type": "file"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/api.PublicTaskAgentUploadEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Upload a public Task Agent file",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/files.zip": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Session ID",
+            "in": "query",
+            "name": "session_id",
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/zip"
+        ],
+        "responses": {
+          "200": {
+            "description": "Workspace ZIP",
+            "schema": {
+              "type": "file"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Download a public workspace ZIP",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/files/{relativePath}": {
+      "delete": {
+        "parameters": [
+          {
+            "description": "Workspace relative path",
+            "in": "path",
+            "name": "relativePath",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Session ID",
+            "in": "query",
+            "name": "session_id",
+            "type": "string"
+          },
+          {
+            "description": "Opaque file ID",
+            "in": "query",
+            "name": "file_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/octet-stream"
+        ],
+        "responses": {
+          "200": {
+            "description": "Workspace file",
+            "schema": {
+              "type": "file"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Download or delete a public workspace file",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "description": "Workspace relative path",
+            "in": "path",
+            "name": "relativePath",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Session ID",
+            "in": "query",
+            "name": "session_id",
+            "type": "string"
+          },
+          {
+            "description": "Opaque file ID",
+            "in": "query",
+            "name": "file_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/octet-stream"
+        ],
+        "responses": {
+          "200": {
+            "description": "Workspace file",
+            "schema": {
+              "type": "file"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Download or delete a public workspace file",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/memories": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentMemoryListEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "List public Task Agent memories",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Memory request",
+            "in": "body",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentMemoryRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentMemoryEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Create a public Task Agent memory",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/memories/{name}": {
+      "delete": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Memory name",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Memory request",
+            "in": "body",
+            "name": "request",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentMemoryRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentMemoryEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Read, update, or delete a public Task Agent memory",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "get": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Memory name",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Memory request",
+            "in": "body",
+            "name": "request",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentMemoryRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentMemoryEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Read, update, or delete a public Task Agent memory",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "patch": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Memory name",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Memory request",
+            "in": "body",
+            "name": "request",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentMemoryRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentMemoryEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Read, update, or delete a public Task Agent memory",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "put": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Memory name",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Memory request",
+            "in": "body",
+            "name": "request",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentMemoryRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentMemoryEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Read, update, or delete a public Task Agent memory",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/prompts": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "Creates a normal conversational Task Agent session when session_id is omitted, or appends a turn to an existing session. request_id is idempotent.",
+        "parameters": [
+          {
+            "description": "Public prompt request",
+            "in": "body",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api.PublicTaskAgentPromptRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "schema": {
+              "$ref": "#/definitions/api.PublicTaskAgentPromptEnvelopeDoc"
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "$ref": "#/definitions/api.ServeErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "schema": {
+              "$ref": "#/definitions/api.ServeErrorResponse"
+            }
+          },
+          "413": {
+            "description": "Request Entity Too Large",
+            "schema": {
+              "$ref": "#/definitions/api.ServeErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Submit a public Task Agent prompt",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/secrets": {
+      "get": {
+        "description": "Lists owned User Secret metadata. Secret values are write-only and are never returned.",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSecretListEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicTaskAgentAPIKey": []
+          }
+        ],
+        "summary": "List User Secrets",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "Creates a write-only User Secret. The response returns metadata only.",
+        "parameters": [
+          {
+            "description": "Secret request",
+            "in": "body",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSecretCreateRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSecretEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicTaskAgentAPIKey": []
+          }
+        ],
+        "summary": "Create a User Secret",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/secrets/{secretID}": {
+      "delete": {
+        "parameters": [
+          {
+            "description": "Secret ID",
+            "in": "path",
+            "name": "secretID",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "$ref": "#/definitions/api.ServeErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "schema": {
+              "$ref": "#/definitions/api.ServeErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicTaskAgentAPIKey": []
+          }
+        ],
+        "summary": "Delete a User Secret",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "patch": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "Replaces the write-only Secret value. The response returns metadata only.",
+        "parameters": [
+          {
+            "description": "Secret ID",
+            "in": "path",
+            "name": "secretID",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Secret request",
+            "in": "body",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSecretUpdateRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSecretEnvelopeDoc"
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "$ref": "#/definitions/api.ServeErrorResponse"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicTaskAgentAPIKey": []
+          }
+        ],
+        "summary": "Update a User Secret value",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/sessions": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Page size (1-100, default 50)",
+            "in": "query",
+            "name": "limit",
+            "type": "integer"
+          },
+          {
+            "description": "Opaque cursor returned by the previous page",
+            "in": "query",
+            "name": "cursor",
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.PublicTaskAgentSessionListEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "List public Task Agent sessions",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/sessions/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "description": "Session ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentTaskEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Delete a public Task Agent session",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "get": {
+        "parameters": [
+          {
+            "description": "Session ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.PublicTaskAgentSessionEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Read a public Task Agent session",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/sessions/{id}/cancel": {
+      "post": {
+        "parameters": [
+          {
+            "description": "Session ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentTaskEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Cancel a public Task Agent session",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/sessions/{id}/events": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Session ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Return persisted events after this sequence",
+            "in": "query",
+            "name": "after",
+            "type": "integer"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentEventListEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "List public Task Agent Event v2 events",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/sessions/{id}/events/stream": {
+      "get": {
+        "description": "Event v2 SSE supports after and Last-Event-ID replay.",
+        "parameters": [
+          {
+            "description": "Session ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Return persisted events after this sequence",
+            "in": "query",
+            "name": "after",
+            "type": "integer"
+          }
+        ],
+        "produces": [
+          "text/event-stream"
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream",
+            "schema": {
+              "type": "string"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Stream public Task Agent events",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/sessions/{id}/interrupt": {
+      "post": {
+        "parameters": [
+          {
+            "description": "Session ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentPromptAcceptedEnvelopeDoc"
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentPromptAcceptedEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Interrupt a public Task Agent turn",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/skills": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSkillListEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "List public Task Agent skills",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Skill request",
+            "in": "body",
+            "name": "request",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSkillRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSkillEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Create a public Task Agent skill",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/skills/{skillID}": {
+      "delete": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Skill ID",
+            "in": "path",
+            "name": "skillID",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Skill request",
+            "in": "body",
+            "name": "request",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSkillRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSkillEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Read, update, or delete a public Task Agent skill",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "get": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Skill ID",
+            "in": "path",
+            "name": "skillID",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Skill request",
+            "in": "body",
+            "name": "request",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSkillRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSkillEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Read, update, or delete a public Task Agent skill",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "patch": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Skill ID",
+            "in": "path",
+            "name": "skillID",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Skill request",
+            "in": "body",
+            "name": "request",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSkillRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSkillEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Read, update, or delete a public Task Agent skill",
+        "tags": [
+          "public-task-agents"
+        ]
+      },
+      "put": {
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "description": "Skill ID",
+            "in": "path",
+            "name": "skillID",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "Skill request",
+            "in": "body",
+            "name": "request",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSkillRequestDoc"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.TaskAgentUserSkillEnvelopeDoc"
+            }
+          }
+        },
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "summary": "Read, update, or delete a public Task Agent skill",
+        "tags": [
+          "public-task-agents"
+        ]
+      }
+    },
+    "/api/public/v1/channels/{connection_id}/wechat-kf/accounts": {
+      "post": {
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "description": "Requires channels:write on a Profile key. Returns account names, IDs and management eligibility for an owned WeChat channel. Does not save the Secret or change bindings. Select an account with manage_privilege=true, then PATCH the WeChat setup with corp_secret and open_kfid.",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "public-task-agents"
+        ],
+        "summary": "Discover WeChat customer service accounts without saving credentials",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Owned WeChat channel connection ID",
+            "name": "connection_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "Application Secret; never include in prompts or logs",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api.WeChatChannelAccountsRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.WeChatChannelAccountsResponse"
+            }
+          },
+          "400": {
+            "description": "wechat_credentials_invalid",
+            "schema": {
+              "$ref": "#/definitions/api.WeChatChannelAccountsErrorDoc"
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "schema": {
+              "$ref": "#/definitions/api.WeChatChannelAccountsErrorDoc"
+            }
+          },
+          "403": {
+            "description": "Requires a Profile key with channels:write",
+            "schema": {
+              "$ref": "#/definitions/api.WeChatChannelAccountsErrorDoc"
+            }
+          },
+          "404": {
+            "description": "WeChat channel not found",
+            "schema": {
+              "$ref": "#/definitions/api.WeChatChannelAccountsErrorDoc"
+            }
+          },
+          "409": {
+            "description": "Channel account unavailable",
+            "schema": {
+              "$ref": "#/definitions/api.WeChatChannelAccountsErrorDoc"
+            }
+          },
+          "422": {
+            "description": "wechat_credentials_invalid, wechat_permission_denied, wechat_ip_not_allowed or wechat_accounts_unavailable",
+            "schema": {
+              "$ref": "#/definitions/api.WeChatChannelAccountsErrorDoc"
+            }
+          },
+          "502": {
+            "description": "wechat_accounts_unavailable",
+            "schema": {
+              "$ref": "#/definitions/api.WeChatChannelAccountsErrorDoc"
+            }
+          }
+        }
+      }
+    },
+    "/api/public/v1/channels/{connection_id}/wechat-kf": {
+      "patch": {
+        "security": [
+          {
+            "PublicBearer": []
+          }
+        ],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "public-task-agents"
+        ],
+        "summary": "Complete WeChat customer service setup",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "connection_id",
+            "name": "connection_id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "Complete WeChat customer service setup request",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api.PublicWeChatCompleteDoc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "api.TaskAgentConnectorAccountListEnvelopeDoc": {
+      "properties": {
+        "connector_accounts": {
+          "items": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentConnectorAccountRequestDoc": {
+      "properties": {
+        "external_account_ref": {
+          "example": "connected-account-id",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "provider": {
+          "example": "github",
+          "type": "string"
+        },
+        "status": {
+          "example": "connected",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentConnectorAccountEnvelopeDoc": {
+      "properties": {
+        "connector_account": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentConnectorStatusEnvelopeDoc": {
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "connection_scope": {
+          "type": "string"
+        },
+        "connectors": {
+          "items": {
+            "$ref": "#/definitions/api.TaskAgentConnectorStatusDoc"
+          },
+          "type": "array"
+        },
+        "has_more": {
+          "type": "boolean"
+        },
+        "limit": {
+          "example": 20,
+          "type": "integer"
+        },
+        "next_cursor": {
+          "type": "string"
+        },
+        "profile_id": {
+          "type": "string"
+        },
+        "search": {
+          "example": "github",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentConnectorStatusDoc": {
+      "properties": {
+        "account_label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "label": {
+          "example": "GitHub",
+          "type": "string"
+        },
+        "logo": {
+          "type": "string"
+        },
+        "provider": {
+          "example": "github",
+          "type": "string"
+        },
+        "runtime_provider": {
+          "example": "composio",
+          "type": "string"
+        },
+        "start_url": {
+          "type": "string"
+        },
+        "status": {
+          "example": "connected",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentConnectorStartEnvelopeDoc": {
+      "properties": {
+        "auth_url": {
+          "type": "string"
+        },
+        "connected_account_id": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.PublicTaskAgentWorkspaceFilesEnvelopeDoc": {
+      "properties": {
+        "has_more": {
+          "type": "boolean"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/definitions/api.PublicTaskAgentWorkspaceItemDoc"
+          },
+          "type": "array"
+        },
+        "next_cursor": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.PublicTaskAgentWorkspaceItemDoc": {
+      "properties": {
+        "file_id": {
+          "example": "opaque-file-id",
+          "type": "string"
+        },
+        "id": {
+          "example": "opaque-file-id",
+          "type": "string"
+        },
+        "name": {
+          "example": "report.csv",
+          "type": "string"
+        },
+        "path": {
+          "example": "uploads/upload-id/report.csv",
+          "type": "string"
+        },
+        "relative_path": {
+          "example": "uploads/upload-id/report.csv",
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "example": 1024,
+          "type": "integer"
+        },
+        "type": {
+          "example": "file",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.PublicTaskAgentUploadEnvelopeDoc": {
+      "properties": {
+        "file": {
+          "$ref": "#/definitions/api.PublicTaskAgentWorkspaceItemDoc"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentMemoryListEnvelopeDoc": {
+      "properties": {
+        "memories": {
+          "items": {
+            "$ref": "#/definitions/api.TaskAgentMemoryDoc"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentMemoryDoc": {
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentMemoryRequestDoc": {
+      "properties": {
+        "content": {
+          "example": "Prefer concise validation notes.",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "name": {
+          "example": "project-preferences",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentMemoryEnvelopeDoc": {
+      "properties": {
+        "memory": {
+          "$ref": "#/definitions/api.TaskAgentMemoryDoc"
+        }
+      },
+      "type": "object"
+    },
+    "api.PublicTaskAgentPromptRequestDoc": {
+      "properties": {
+        "dynamic_tools": {
+          "items": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "model": {
+          "example": "hast/auto",
+          "type": "string"
+        },
+        "prompt": {
+          "example": "Summarize the release notes.",
+          "type": "string"
+        },
+        "reasoning_effort": {
+          "example": "medium",
+          "type": "string"
+        },
+        "request_id": {
+          "example": "client-turn-1",
+          "type": "string"
+        },
+        "secret_bindings": {
+          "items": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "session_id": {
+          "example": "sess_abc123",
+          "type": "string"
+        },
+        "skill_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "system_prompt": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.PublicTaskAgentPromptEnvelopeDoc": {
+      "properties": {
+        "request_id": {
+          "example": "client-turn-1",
+          "type": "string"
+        },
+        "session_id": {
+          "example": "sess_abc123",
+          "type": "string"
+        },
+        "status": {
+          "example": "dispatch_pending",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.ServeErrorResponse": {
+      "properties": {
+        "code": {
+          "description": "Code is the business status code (0 = success; see pkg/utils/errors.go).",
+          "example": 0,
+          "type": "integer"
+        },
+        "message": {
+          "description": "Message is a human-readable status or error description.",
+          "example": "ok",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentUserSecretListEnvelopeDoc": {
+      "properties": {
+        "secrets": {
+          "items": {
+            "$ref": "#/definitions/api.TaskAgentUserSecretDoc"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentUserSecretDoc": {
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "id": {
+          "example": "sec_123",
+          "type": "string"
+        },
+        "name": {
+          "example": "kubeconfig",
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentUserSecretCreateRequestDoc": {
+      "properties": {
+        "name": {
+          "example": "kubeconfig",
+          "type": "string"
+        },
+        "value": {
+          "example": "write-only",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentUserSecretEnvelopeDoc": {
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/api.TaskAgentUserSecretDoc"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentUserSecretUpdateRequestDoc": {
+      "properties": {
+        "value": {
+          "example": "write-only",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.PublicTaskAgentSessionListEnvelopeDoc": {
+      "properties": {
+        "has_more": {
+          "type": "boolean"
+        },
+        "next_cursor": {
+          "type": "string"
+        },
+        "sessions": {
+          "items": {
+            "$ref": "#/definitions/api.PublicTaskAgentSessionDoc"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "api.PublicTaskAgentSessionDoc": {
+      "properties": {
+        "event_cursor": {
+          "type": "integer"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "runtime_provider": {
+          "type": "string"
+        },
+        "session_id": {
+          "example": "sess_abc123",
+          "type": "string"
+        },
+        "status": {
+          "example": "running",
+          "type": "string"
+        },
+        "task_origin": {
+          "example": "session",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentTaskEnvelopeDoc": {
+      "properties": {
+        "task": {
+          "$ref": "#/definitions/api.TaskAgentTaskDoc"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentTaskDoc": {
+      "properties": {
+        "client_id": {
+          "example": "client-main-user-123",
+          "type": "string"
+        },
+        "config": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "event_cursor": {
+          "example": 42,
+          "type": "integer"
+        },
+        "id": {
+          "example": "task-agent-123",
+          "type": "string"
+        },
+        "mode": {
+          "example": "agent_run",
+          "type": "string"
+        },
+        "profile_id": {
+          "example": "user_123",
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "runtime_provider": {
+          "example": "cubesandbox",
+          "type": "string"
+        },
+        "sandbox_id": {
+          "example": "sandbox-main-user-123",
+          "type": "string"
+        },
+        "sandbox_scope": {
+          "example": "main",
+          "type": "string"
+        },
+        "status": {
+          "example": "needs_input",
+          "type": "string"
+        },
+        "task_origin": {
+          "example": "session",
+          "type": "string"
+        },
+        "title": {
+          "example": "Release validation",
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "workspace_object_prefix": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.PublicTaskAgentSessionEnvelopeDoc": {
+      "properties": {
+        "session": {
+          "$ref": "#/definitions/api.PublicTaskAgentSessionDoc"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentEventListEnvelopeDoc": {
+      "properties": {
+        "events": {
+          "items": {
+            "$ref": "#/definitions/api.TaskAgentEventDoc"
+          },
+          "type": "array"
+        },
+        "has_more": {
+          "example": true,
+          "type": "boolean"
+        },
+        "next_after": {
+          "example": 42,
+          "format": "int64",
+          "type": "integer",
+          "x-nullable": true
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentEventDoc": {
+      "discriminator": "type",
+      "properties": {
+        "created_at": {
+          "example": "2026-08-16T12:00:00Z",
+          "format": "date-time",
+          "type": "string"
+        },
+        "data": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+            }
+          ],
+          "description": "Data is the HAST-owned payload union; Type selects its required shape as\ndefined in docs/reference/task-agent-event-v2.md."
+        },
+        "engine": {
+          "enum": [
+            "codex_cli",
+            "pi_agent_cli"
+          ],
+          "example": "codex_cli",
+          "type": "string"
+        },
+        "event_id": {
+          "example": "evt_123",
+          "type": "string"
+        },
+        "replayable": {
+          "example": true,
+          "type": "boolean"
+        },
+        "run_id": {
+          "example": "run_123",
+          "type": "string"
+        },
+        "schema_version": {
+          "enum": [
+            2
+          ],
+          "example": 2,
+          "type": "integer"
+        },
+        "sequence": {
+          "description": "Sequence is a positive durable order, or null for volatile events.",
+          "example": 42,
+          "minimum": 1,
+          "type": "integer",
+          "x-nullable": true
+        },
+        "session_id": {
+          "example": "session_123",
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "runtime",
+            "backplane",
+            "workspace"
+          ],
+          "example": "runtime",
+          "type": "string"
+        },
+        "task_id": {
+          "example": "task_123",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "runtime.status",
+            "run.queued",
+            "run.started",
+            "run.retrying",
+            "run.completed",
+            "run.failed",
+            "run.interrupted",
+            "message.started",
+            "message.delta",
+            "message.completed",
+            "reasoning.started",
+            "reasoning.delta",
+            "reasoning.completed",
+            "tool.started",
+            "tool.updated",
+            "tool.completed",
+            "plan.updated",
+            "plan.completed",
+            "usage.updated",
+            "file.changed",
+            "input.requested",
+            "context.compacted",
+            "warning",
+            "error"
+          ],
+          "example": "message.completed",
+          "type": "string"
+        }
+      },
+      "required": [
+        "created_at",
+        "data",
+        "engine",
+        "event_id",
+        "replayable",
+        "schema_version",
+        "sequence",
+        "source",
+        "task_id",
+        "type"
+      ],
+      "type": "object",
+      "x-hast-event-variants": {
+        "context.compacted": {
+          "$ref": "#/definitions/context.compacted"
+        },
+        "error": {
+          "$ref": "#/definitions/error"
+        },
+        "file.changed": {
+          "$ref": "#/definitions/file.changed"
+        },
+        "input.requested": {
+          "$ref": "#/definitions/input.requested"
+        },
+        "message.completed": {
+          "$ref": "#/definitions/message.completed"
+        },
+        "message.delta": {
+          "$ref": "#/definitions/message.delta"
+        },
+        "message.started": {
+          "$ref": "#/definitions/message.started"
+        },
+        "plan.completed": {
+          "$ref": "#/definitions/plan.completed"
+        },
+        "plan.updated": {
+          "$ref": "#/definitions/plan.updated"
+        },
+        "reasoning.completed": {
+          "$ref": "#/definitions/reasoning.completed"
+        },
+        "reasoning.delta": {
+          "$ref": "#/definitions/reasoning.delta"
+        },
+        "reasoning.started": {
+          "$ref": "#/definitions/reasoning.started"
+        },
+        "run.completed": {
+          "$ref": "#/definitions/run.completed"
+        },
+        "run.failed": {
+          "$ref": "#/definitions/run.failed"
+        },
+        "run.interrupted": {
+          "$ref": "#/definitions/run.interrupted"
+        },
+        "run.queued": {
+          "$ref": "#/definitions/run.queued"
+        },
+        "run.retrying": {
+          "$ref": "#/definitions/run.retrying"
+        },
+        "run.started": {
+          "$ref": "#/definitions/run.started"
+        },
+        "runtime.status": {
+          "$ref": "#/definitions/runtime.status"
+        },
+        "tool.completed": {
+          "$ref": "#/definitions/tool.completed"
+        },
+        "tool.started": {
+          "$ref": "#/definitions/tool.started"
+        },
+        "tool.updated": {
+          "$ref": "#/definitions/tool.updated"
+        },
+        "usage.updated": {
+          "$ref": "#/definitions/usage.updated"
+        },
+        "warning": {
+          "$ref": "#/definitions/warning"
+        }
+      }
+    },
+    "api.TaskAgentEventDataDoc": {
+      "properties": {
+        "attempt": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "attempts": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "channel": {
+          "enum": [
+            "stdout",
+            "stderr",
+            "progress"
+          ],
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "context_window": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cost": {},
+        "delta": {
+          "type": "string"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "error": {
+          "type": "string"
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "final_message_id": {
+          "type": "string"
+        },
+        "finish_reason": {
+          "type": "string"
+        },
+        "input": {},
+        "is_error": {
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "last": {
+          "$ref": "#/definitions/api.TaskAgentEventTokenUsageDoc"
+        },
+        "message": {
+          "type": "string"
+        },
+        "message_id": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "model_source": {
+          "type": "string"
+        },
+        "modified_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "operation": {
+          "enum": [
+            "update",
+            "delete"
+          ],
+          "type": "string"
+        },
+        "options": {
+          "items": {},
+          "type": "array"
+        },
+        "output": {},
+        "parent_tool_call_id": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "plan_id": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "reasoning_id": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "role": {
+          "enum": [
+            "user",
+            "assistant",
+            "system"
+          ],
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "starting",
+            "ready",
+            "failed",
+            "released",
+            "succeeded",
+            "interrupted"
+          ],
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/definitions/api.TaskAgentEventPlanStepDoc"
+          },
+          "type": "array"
+        },
+        "text": {
+          "type": "string"
+        },
+        "tokens_after": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tokens_before": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tool_call_id": {
+          "type": "string"
+        },
+        "total": {
+          "$ref": "#/definitions/api.TaskAgentEventTokenUsageDoc"
+        },
+        "turn_type": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentEventTokenUsageDoc": {
+      "properties": {
+        "cache_read_tokens": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cache_write_tokens": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "input_tokens": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "output_tokens": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reasoning_tokens": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total_tokens": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cache_read_tokens",
+        "cache_write_tokens",
+        "input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "total_tokens"
+      ],
+      "type": "object"
+    },
+    "api.TaskAgentEventPlanStepDoc": {
+      "properties": {
+        "status": {
+          "enum": [
+            "pending",
+            "in_progress",
+            "completed"
+          ],
+          "example": "in_progress",
+          "type": "string"
+        },
+        "step": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "step"
+      ],
+      "type": "object"
+    },
+    "context.compacted": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventContextCompactedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "context.compacted"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventContextCompactedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "error": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventErrorDataDoc"
+            },
+            "type": {
+              "enum": [
+                "error"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventErrorDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "scope",
+            "code",
+            "message",
+            "retryable"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "file.changed": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventFileChangedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "file.changed"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventFileChangedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "path",
+            "operation"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "input.requested": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventInputRequestedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "input.requested"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventInputRequestedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "request_id",
+            "kind",
+            "prompt"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "message.completed": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventMessageCompletedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "message.completed"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventMessageCompletedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "message_id",
+            "role",
+            "text"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "message.delta": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventMessageDeltaDataDoc"
+            },
+            "type": {
+              "enum": [
+                "message.delta"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventMessageDeltaDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "message_id",
+            "role",
+            "delta"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "message.started": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventMessageStartedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "message.started"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventMessageStartedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "message_id",
+            "role"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "plan.completed": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventPlanCompletedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "plan.completed"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventPlanCompletedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "plan_id"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "plan.updated": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventPlanUpdatedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "plan.updated"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventPlanUpdatedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "plan_id"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "reasoning.completed": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventReasoningCompletedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "reasoning.completed"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventReasoningCompletedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "reasoning_id",
+            "text"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "reasoning.delta": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventReasoningDeltaDataDoc"
+            },
+            "type": {
+              "enum": [
+                "reasoning.delta"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventReasoningDeltaDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "reasoning_id",
+            "delta"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "reasoning.started": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventReasoningStartedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "reasoning.started"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventReasoningStartedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "reasoning_id"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "run.completed": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventRunCompletedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "run.completed"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventRunCompletedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "final_message_id",
+            "finish_reason",
+            "attempts"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "run.failed": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventRunFailedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "run.failed"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventRunFailedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "code",
+            "message",
+            "retryable",
+            "attempts"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "run.interrupted": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventRunInterruptedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "run.interrupted"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventRunInterruptedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "run.queued": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventRunQueuedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "run.queued"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventRunQueuedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "request_id",
+            "turn_type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "run.retrying": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventRunRetryingDataDoc"
+            },
+            "type": {
+              "enum": [
+                "run.retrying"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventRunRetryingDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "attempt",
+            "code",
+            "message"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "run.started": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventRunStartedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "run.started"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventRunStartedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "request_id",
+            "turn_type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "runtime.status": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventRuntimeStatusDataDoc"
+            },
+            "type": {
+              "enum": [
+                "runtime.status"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventRuntimeStatusDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "properties": {
+            "status": {
+              "enum": [
+                "starting",
+                "ready",
+                "failed",
+                "released"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "tool.completed": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventToolCompletedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "tool.completed"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventToolCompletedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "properties": {
+            "status": {
+              "enum": [
+                "succeeded",
+                "failed",
+                "interrupted"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "tool_call_id",
+            "kind",
+            "name",
+            "status",
+            "is_error"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "tool.started": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventToolStartedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "tool.started"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventToolStartedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "tool_call_id",
+            "kind",
+            "name"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "tool.updated": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventToolUpdatedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "tool.updated"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventToolUpdatedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "tool_call_id",
+            "channel",
+            "delta"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "usage.updated": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventUsageUpdatedDataDoc"
+            },
+            "type": {
+              "enum": [
+                "usage.updated"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventUsageUpdatedDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "model",
+            "context_window",
+            "total"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "warning": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDoc"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/definitions/api.TaskAgentEventWarningDataDoc"
+            },
+            "type": {
+              "enum": [
+                "warning"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentEventWarningDataDoc": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/api.TaskAgentEventDataDoc"
+        },
+        {
+          "required": [
+            "scope",
+            "code",
+            "message",
+            "retryable"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "api.TaskAgentPromptAcceptedEnvelopeDoc": {
+      "properties": {
+        "request_id": {
+          "example": "task-agent-turn-1710000000000000000",
+          "type": "string"
+        },
+        "status": {
+          "example": "queued",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentUserSkillListEnvelopeDoc": {
+      "properties": {
+        "skills": {
+          "items": {
+            "$ref": "#/definitions/api.TaskAgentUserSkillDoc"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentUserSkillDoc": {
+      "properties": {
+        "capability_id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "directory_name": {
+          "example": "e2e-summary",
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "entrypoint_path": {
+          "example": "SKILL.md",
+          "type": "string"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/definitions/api.TaskAgentSkillFileDoc"
+          },
+          "type": "array"
+        },
+        "hash": {
+          "example": "sha256:abc123",
+          "type": "string"
+        },
+        "skill_id": {
+          "example": "e2e-summary",
+          "type": "string"
+        },
+        "source": {
+          "example": "user",
+          "type": "string"
+        },
+        "status": {
+          "example": "active",
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentSkillFileDoc": {
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "path": {
+          "example": "SKILL.md",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentUserSkillRequestDoc": {
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "directory_name": {
+          "example": "e2e-summary",
+          "type": "string"
+        },
+        "display_name": {
+          "example": "E2E Summary",
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "entrypoint_path": {
+          "example": "SKILL.md",
+          "type": "string"
+        },
+        "expected_checksum_sha256": {
+          "type": "string"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/definitions/api.TaskAgentSkillFileDoc"
+          },
+          "type": "array"
+        },
+        "skill_id": {
+          "example": "e2e-summary",
+          "type": "string"
+        },
+        "source_type": {
+          "example": "upload",
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "api.TaskAgentUserSkillEnvelopeDoc": {
+      "properties": {
+        "skill": {
+          "$ref": "#/definitions/api.TaskAgentUserSkillDoc"
+        }
+      },
+      "type": "object"
+    },
+    "api.WeChatChannelAccountsRequest": {
+      "type": "object",
+      "required": [
+        "corp_secret"
+      ],
+      "properties": {
+        "corp_secret": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      }
+    },
+    "api.WeChatChannelAccountsResponse": {
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api.WeChatChannelAccount"
+          }
+        }
+      }
+    },
+    "api.WeChatChannelAccount": {
+      "type": "object",
+      "properties": {
+        "manage_privilege": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "open_kfid": {
+          "type": "string"
+        }
+      }
+    },
+    "api.WeChatChannelAccountsErrorDoc": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        }
+      }
+    },
+    "api.PublicWeChatCompleteDoc": {
+      "type": "object",
+      "required": [
+        "corp_secret",
+        "open_kfid"
+      ],
+      "properties": {
+        "corp_secret": {
+          "type": "string"
+        },
+        "open_kfid": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "PublicBearer": {
+      "description": "Personal API key as `Bearer hast_pk_*` for `/api/public/v1`.",
+      "in": "header",
+      "name": "Authorization",
+      "type": "apiKey"
+    },
+    "PublicTaskAgentAPIKey": {
+      "description": "Personal API key as `Bearer hast_pk_*` for `/api/public/v1`.",
+      "in": "header",
+      "name": "Authorization",
+      "type": "apiKey"
+    }
+  },
+  "x-hast-normalization": "PublicTaskAgentAPIKey is an alias of PublicBearer; the upstream secrets operations reference the undeclared alias.",
+  "x-hast-source": "https://backend.hast.so/api/v1/openapi/spec?app=serve",
+  "x-hast-retrieved-at": "2026-09-17T09:56:09.818Z",
+  "x-hast-source-overrides": {
+    "paths": [
+      "/api/public/v1/channels/{connection_id}/wechat-kf/accounts",
+      "/api/public/v1/channels/{connection_id}/wechat-kf"
+    ],
+    "source": "apps/backplane/internal/app/serve/httpapi/openapi_public_aip.go",
+    "generated-at": "2026-09-23T08:33:00.457398+00:00"
+  }
+}

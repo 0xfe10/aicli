@@ -90,6 +90,7 @@ jobs:
           - fns
           - itsaplan
           - paseo-bridge
+          - hast
           - ozon
           - lanhu
           - devopsh

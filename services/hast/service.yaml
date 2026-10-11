@@ -1,0 +1,25 @@
+id: hast
+name: Hast Task Agent
+status: active
+implementation:
+  type: go-command
+  package: ./cmd/hast
+  command: hast
+  transport: embedded-restish-v2.3.0
+  api_description: https://hast.so/openapi/task-agent.json
+  api_description_format: swagger-2.0
+authentication:
+  supported: [personal-api-key]
+  header: Authorization
+  scheme: Bearer
+  local_commands: [auth login --mode key, auth status, auth logout]
+  config_path: $XDG_CONFIG_HOME/aicli/hast/config.toml
+  environment_override: true
+safety:
+  write_mode_default: readonly
+notes:
+  - API origin defaults to https://backend.hast.so.
+  - HAST_API_BASE supports the documented /api/public/v1 suffix without duplicating paths.
+  - PublicBearer and PublicTaskAgentAPIKey refer to the same scoped key.
+  - Write requests are never automatically retried; 202 is acceptance, not completion.
+  - Profile-only channel operations and other scopes are enforced by the server.

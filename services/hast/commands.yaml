@@ -1,0 +1,26 @@
+surface:
+  source: https://hast.so/openapi/task-agent.json
+  generation: runtime
+  layout: tags
+  naming: restish-generated-from-upstream-paths
+  coverage: all-published-operations
+  normalization:
+    - Convert Swagger 2.0 to OpenAPI 3.
+    - Relocate references in event variant vendor extensions.
+    - Remove mutation bodies from GET operations.
+    - Declare multipart upload content type.
+    - Bind both authentication scheme names to the personal Bearer key.
+support_commands:
+  namespace: hast cli
+  auth: [auth login --mode key, auth status, auth logout]
+  context: [context current, context list, context use]
+write_policy:
+  environment: HAST_WRITE_MODE
+  default: readonly
+  write: permits POST, PUT, PATCH except destructive paths
+  destructive: also permits DELETE and delete/purge/clear/revoke path operations
+retry_policy:
+  unsafe_requests: disabled-regardless-of-restish-flags-or-environment
+output:
+  owner: restish
+  events: sse-ndjson-with-explicit-after-or-last-event-id-cursor
