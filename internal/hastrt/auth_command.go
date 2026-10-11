@@ -15,7 +15,7 @@ func defaultAuthIO() AuthIO {
 	return authflow.DefaultIO()
 }
 
-// MaybeRunAuth handles `hast auth ...` before Restish sees argv.
+// MaybeRunAuth handles `hast auth ...` before the MCP runtime sees argv.
 func MaybeRunAuth(args []string) (handled bool, err error) {
 	return MaybeRunAuthWithContext(args, contextManager.DefaultSelection())
 }
@@ -26,7 +26,6 @@ func MaybeRunAuthWithContext(args []string, selection contextflow.Selection) (ha
 	if err != nil || !handled {
 		return handled, err
 	}
-	configureStatePathsFor(selection)
 	return true, RunAuthWithContext(authArgs, defaultAuthIO(), selection)
 }
 

@@ -16,7 +16,8 @@ their release archive. Users install one command per service.
 - `internal/lanhurt/` provides the observed Lanhu API, Cookie auth, design workflows, and Axure rendering.
 - `internal/devopshrt/` binds DevOpsH to the packaged mcp2cli runtime.
 - `internal/paseobridgert/` binds Paseo Bridge OpenAPI 3.1, scoped Bearer auth, and send safety to Restish.
-- `internal/hastrt/` converts Hast Task Agent Swagger, adapts Bearer key authentication, and guards writes.
+- `internal/hastrt/` exposes Hast MCP tools, resources and prompts with Bearer auth and write guards.
+- `internal/mcp2clirt/` extracts the pinned MCP runtime shared by Hast and DevOpsH.
 - `internal/cli/` contains JSON helpers used by the `aicli` registry command.
 - `services/` contains service registrations and command-surface metadata.
 - `openwiki/` contains repository knowledge and architecture decisions.
@@ -325,60 +326,73 @@ just paseo-bridge-spec-check
 just build-paseo-bridge
 ```
 
-## Hast Task Agent (`hast`)
+## Hast AIP MCP (`hast`)
 
-The CLI generates all 39 published operations from
-[Hast's Swagger 2.0 contract](https://hast.so/openapi/task-agent.json), following the
-[Task API quickstart](https://hast.so/zh-CN/docs/task-api-quickstart). The default
-API origin is `https://backend.hast.so`. Personal API keys are sent as Bearer
-credentials; `prompts:write` submits tasks and `sessions:read` reads sessions/events.
-Other endpoints require their corresponding scopes; WeChat setup requires a
-Profile key with `channels:write`.
+`hast` discovers the tools, resources and prompts available to the selected key at
+`https://backend.hast.so/api/public/v1/mcp`, following the
+[MCP guide](https://hast.so/zh-CN/docs/mcp). Saved AIP Agents are represented by
+Webhooks; `post_webhooks` creates one. Tool availability depends on the key's
+Profile and scopes. Agent configuration requires `webhooks:read`; creating,
+updating and invoking Agents requires `webhooks:write`.
+
+Existing `hast auth` credentials and contexts remain valid. Login accepts an API
+origin such as `https://backend.hast.so`, then prompts for a hidden API key. Hast
+MCP uses Bearer keys and does not provide OAuth login.
 
 ```sh
-hast auth login --mode key  # prompts for API origin, then hidden personal API key
+hast auth login --mode key
 hast auth status
-hast public-task-agents --help
-hast public-task-agents get-api-public-v1-sessions --limit 50 -o json
-hast public-task-agents get-api-public-v1-sessions-id SESSION_ID -o json
-
-# A real task submission, using a new request_id for each new turn.
-HAST_WRITE_MODE=write hast public-task-agents post-api-public-v1-prompts 'request_id: req_123, prompt: Summarize the latest workspace files.' -o json
-hast public-task-agents get-api-public-v1-sessions-id-events-stream SESSION_ID --after 0 -o ndjson
-
-# Multipart upload and binary download require a workspace file_id for retrieval.
-HAST_WRITE_MODE=write hast public-task-agents post-api-public-v1-files 'file: @./input.txt' -o json
-hast public-task-agents get-api-public-v1-files-relativepath input.txt FILE_ID --session-id SESSION_ID > input.txt
-hast public-task-agents get-api-public-v1-files-zip --session-id SESSION_ID > workspace.zip
+hast context list
+hast --context work auth login --mode key
+hast ls
+hast --help
+hast get hast://guides/overview
+hast get hast://guides/enterprise-agent
+hast get_models --json
+hast get_webhooks --json
+hast get_sessions --args-json '{"query":{"limit":5}}' --json
 ```
 
-HTTP 202 means accepted. Save the returned `session_id` and inspect run events
-for task completion; `message.completed` is only one message. SSE uses one
-connection. Reconnect with the last durable sequence via `--after SEQUENCE` or
-`-H 'Last-Event-ID: SEQUENCE'`; `--rsh-max-items N` limits events. Persisted events
-can also be fetched using `get-api-public-v1-sessions-id-events --after SEQUENCE`.
-A repeated `request_id` is idempotent according to Hast; use a fresh ID for a new
-turn. The CLI never automatically retries writes, including auth retries and
-307/308 body replays, even with Restish unsafe-retry overrides.
+Commands follow MCP tool names, including underscores. Pass the complete nested
+`path`, `query`, `body` or `upload` object with `--args-json` or `--args-file`;
+`--input-json` is for client elicitation, not the tool request body. For example,
+`agent.json` contains `{ "body": { "title": "degov", ... } }`, with model and
+policy values selected from `get_models` and `get_webhooks`:
 
-Environment variables override local config without rewriting it:
+```sh
+HAST_WRITE_MODE=write hast post_webhooks --args-file agent.json --json
+hast get_webhooks_hook_id --args-json '{"path":{"hook_id":"HOOK_ID"}}' --json
+```
 
-- `HAST_API_KEY`: personal API key (sent as `Authorization: Bearer`).
-- `HAST_API_BASE`: documented API root, e.g. `https://backend.hast.so/api/public/v1`.
-- `HAST_BASE_URL`: optional API origin override; takes precedence over `HAST_API_BASE`.
-- `HAST_SPEC_URL`: optional alternate Swagger JSON URL; discovery sends no key.
+`HAST_WRITE_MODE` defaults to `readonly`; `write` permits non-destructive writes,
+and `destructive` also permits deletions. Gates apply to typed tools and generic
+MCP calls. Failed MCP tools produce a nonzero exit code. Writes are not
+transparently replayed or redirected. HTTP 202 means accepted; follow paginated
+session events until the matching run reaches a terminal state.
+
+Environment variables:
+
+- `HAST_API_KEY`: overrides the stored Bearer key.
+- `HAST_BASE_URL`: overrides the API origin.
+- `HAST_API_BASE`: accepts the documented `/api/public/v1` suffix; `HAST_BASE_URL` takes precedence.
 - `HAST_CONTEXT`: selected account context; `--context NAME` takes precedence.
-- `HAST_WRITE_MODE`: `readonly` (default), `write`, or `destructive` (also permits DELETE).
+- `HAST_WRITE_MODE`: `readonly`, `write` or `destructive`.
 
-Config lives at `$XDG_CONFIG_HOME/aicli/hast/config.toml` with mode `0600`
-(directory `0700`). Named contexts isolate credentials and caches. Discovery
-rejects external references and ignores upstream server origins. Authenticated
-response caching is disabled and `--rsh-config` is ignored. User Secret endpoints
-return metadata only; keep business secret request bodies in protected input files
-rather than command history.
+Credentials remain at `$XDG_CONFIG_HOME/aicli/hast/config.toml`, mode `0600`.
+The runtime receives a local authenticated bridge address; the real key stays in
+the Go process. Discovery caches are isolated by context, origin and credential.
+Telemetry is disabled. `HAST_SPEC_URL` and Restish options no longer apply.
+Use `--json` for structured output. MCP file transfers use Base64; resources and
+prompts are discovered alongside tools.
+
+This is a command-surface change from v0.9.x: commands such as
+`hast public-task-agents get-api-public-v1-sessions` become `hast get_sessions`.
+Hast MCP release archives include the pinned mcp2cli 0.1.10 runtime and its
+license, for Linux/macOS amd64 and arm64. Windows releases are unavailable
+because this runtime version has no upstream Windows artifacts.
 
 ```sh
 just test-hast
-just hast-spec-check
 just build-hast
+just hast-mcp-check
 ```

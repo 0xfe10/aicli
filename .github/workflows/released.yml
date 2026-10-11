@@ -109,6 +109,13 @@ jobs:
             goos: windows
             goarch: arm64
 
+          - command: hast
+            goos: windows
+            goarch: amd64
+          - command: hast
+            goos: windows
+            goarch: arm64
+
     steps:
       - name: Check out release commit
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5

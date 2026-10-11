@@ -185,8 +185,6 @@ release-build: _validate-version
     @just build-archive hast linux arm64
     @just build-archive hast darwin amd64
     @just build-archive hast darwin arm64
-    @just build-archive hast windows amd64
-    @just build-archive hast windows arm64
     @just release-checksums
     @echo "release artifacts in {{ out_dir }}"
     @ls -lh "{{ out_dir }}"
@@ -199,8 +197,8 @@ release-checksums: _validate-version
     set -euo pipefail
     cd "{{ out_dir }}"
     archive_count="$(find . -maxdepth 1 -type f \( -name '*_{{ version }}_*.tar.gz' -o -name '*_{{ version }}_*.zip' \) | wc -l)"
-    if [[ "$archive_count" -ne 52 ]]; then
-      echo "expected 52 release archives, found ${archive_count}" >&2
+    if [[ "$archive_count" -ne 50 ]]; then
+      echo "expected 50 release archives, found ${archive_count}" >&2
       exit 1
     fi
     sha256sum ./*_"{{ version }}"_*.tar.gz ./*_"{{ version }}"_*.zip > checksums.txt
@@ -289,7 +287,7 @@ _build-archive command goos goarch:
 
     stage="$(mktemp -d)"
     echo "building ${archive_base}"
-    if [[ "$command" == "devopsh" ]]; then
+    if [[ "$command" == "devopsh" || "$command" == "hast" ]]; then
       case "${goos}/${goarch}" in
         linux/amd64) target=x86_64-unknown-linux-musl; expected=a0e53b0685638b0263415fa891d5884f52419b24579dc513fd2db1c11327735e ;;
         linux/arm64) target=aarch64-unknown-linux-musl; expected=0fd984d7398d1d6db8b583d63a33dbdfaab3c928c59848299addfdfd50121b6c ;;
@@ -306,16 +304,16 @@ _build-archive command goos goarch:
         "mcp2cli-{{ mcp2cli_version }}-${target}/mcp2cli" \
         "mcp2cli-{{ mcp2cli_version }}-${target}/LICENSE"
       runtime_sha="$(sha256sum "${stage}/mcp2cli" | awk '{print $1}')"
-      trap 'rm -f internal/devopshrt/runtime.gz' EXIT
-      gzip -n -9 -c "${stage}/mcp2cli" > internal/devopshrt/runtime.gz
+      trap 'rm -f internal/mcp2clirt/runtime.gz' EXIT
+      gzip -n -9 -c "${stage}/mcp2cli" > internal/mcp2clirt/runtime.gz
       mv "${stage}/LICENSE" "${stage}/MCP2CLI_LICENSE"
       rm "$runtime_archive"
       rm "${stage}/mcp2cli"
-      ldflags+=" -X github.com/0xfe10/aicli/internal/devopshrt.runtimeSHA256=${runtime_sha}"
+      ldflags+=" -X github.com/0xfe10/aicli/internal/mcp2clirt.runtimeSHA256=${runtime_sha}"
       CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
         go build -tags embedded_runtime -trimpath -buildvcs=false -ldflags "$ldflags" \
         -o "${stage}/${binary}" "./cmd/${command}"
-      rm internal/devopshrt/runtime.gz
+      rm internal/mcp2clirt/runtime.gz
       trap - EXIT
     else
       CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
@@ -334,13 +332,13 @@ _build-archive command goos goarch:
       )
     else
       files=("$binary" LICENSE THIRD_PARTY_NOTICES.md)
-      if [[ "$command" == "devopsh" ]]; then files+=(MCP2CLI_LICENSE); fi
+      if [[ "$command" == "devopsh" || "$command" == "hast" ]]; then files+=(MCP2CLI_LICENSE); fi
       tar -C "$stage" -czf "${output_dir}/${archive_base}.tar.gz" "${files[@]}"
     fi
     rm "${stage}/${binary}"
     rm "${stage}/LICENSE"
     rm "${stage}/THIRD_PARTY_NOTICES.md"
-    if [[ "$command" == "devopsh" ]]; then
+    if [[ "$command" == "devopsh" || "$command" == "hast" ]]; then
       rm "${stage}/MCP2CLI_LICENSE"
     fi
     rmdir "$stage"
@@ -370,7 +368,9 @@ test-hast:
     go test ./internal/hastrt ./cmd/hast
 
 build-hast: _validate-version
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version={{ version }} -X main.commit={{ commit }}" -o "{{ out_dir }}/hast" ./cmd/hast
+    @just build-archive hast "$(go env GOOS)" "$(go env GOARCH)"
+    tar -xzf "{{ out_dir }}/hast_{{ version }}_$(go env GOOS)_$(go env GOARCH).tar.gz" -C "{{ out_dir }}" hast
 
-hast-spec-check:
-    HAST_SPEC_CHECK_URL="${HAST_SPEC_URL:-https://hast.so/openapi/task-agent.json}" go test -count=1 -run TestLiveSpec -v ./internal/hastrt
+hast-mcp-check:
+    "{{ out_dir }}/hast" ls
+    "{{ out_dir }}/hast" get_models --json
