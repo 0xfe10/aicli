@@ -1,0 +1,23 @@
+id: paseo-bridge
+name: Paseo Bridge
+status: active
+implementation:
+  type: go-command
+  package: ./cmd/paseo-bridge
+  command: paseo-bridge
+  transport: embedded-restish-v2.3.0
+  api_description: "<selected-base-url>/api/v1/openapi.json"
+  api_description_format: openapi-3.1
+authentication:
+  supported: [bearer-token]
+  header: Authorization
+  local_commands: [auth login --mode token, auth status, auth logout]
+  config_path: $XDG_CONFIG_HOME/aicli/paseo-bridge/config.toml
+  environment_override: true
+safety:
+  write_mode_default: readonly
+notes:
+  - API origin defaults to https://paseo-bridge.kahub.in and is configurable per context.
+  - Tokens are scoped by host and operation; administration remains local to the server.
+  - Sends are never automatically retried, including unauthorized responses and body-preserving redirects.
+  - HTTP success, accepted messages, and agent idle do not prove message completion.

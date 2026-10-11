@@ -1,0 +1,20 @@
+surface:
+  source: "<selected-base-url>/api/v1/openapi.json"
+  generation: runtime
+  layout: tags
+  naming: upstream-operation-id
+  coverage: business-operations-excluding-documentation-assets
+support_commands:
+  namespace: paseo-bridge cli
+  auth: [auth login --mode token, auth status, auth logout]
+  context: [context current, context list, context use]
+write_policy:
+  environment: PASEO_BRIDGE_WRITE_MODE
+  default: readonly
+  write: permits POST, PUT, PATCH except destructive paths
+  destructive: also permits DELETE and delete/purge/clear/revoke path operations
+retry_policy:
+  unsafe_requests: disabled-regardless-of-restish-flags-or-environment
+output:
+  owner: restish
+  observation: single-connection-sse-with-ndjson-output

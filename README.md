@@ -8,13 +8,14 @@ their release archive. Users install one command per service.
 
 ## Structure
 
-- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`, `ozon`, `lanhu`, `devopsh`).
+- `cmd/` contains release command entrypoints (`aicli`, `pingcode`, `fns`, `ozon`, `lanhu`, `devopsh`, `itsaplan`, `paseo-bridge`).
 - `internal/pingcodert/` adapts PingCode's API description and authentication to Restish.
 - `internal/swagger2rt/` converts Swagger / OpenAPI 2 documents to OpenAPI 3 for Restish.
 - `internal/fnsrt/` adapts Fast Note Sync (FNS) specs, auth, and write safety to Restish.
 - `internal/ozonrt/` repairs the Ozon Seller OpenAPI and applies header auth and operation-level write safety.
 - `internal/lanhurt/` provides the observed Lanhu API, Cookie auth, design workflows, and Axure rendering.
 - `internal/devopshrt/` binds DevOpsH to the packaged mcp2cli runtime.
+- `internal/paseobridgert/` binds Paseo Bridge OpenAPI 3.1, scoped Bearer auth, and send safety to Restish.
 - `internal/cli/` contains JSON helpers used by the `aicli` registry command.
 - `services/` contains service registrations and command-surface metadata.
 - `openwiki/` contains repository knowledge and architecture decisions.
@@ -269,4 +270,56 @@ Authenticated response caching is disabled. External OpenAPI references are reje
 just test-itsaplan
 just itsaplan-spec-check
 just build-itsaplan
+```
+
+## Paseo Bridge (`paseo-bridge`)
+
+Commands are generated from `<base-url>/api/v1/openapi.json`; the default origin
+is `https://paseo-bridge.kahub.in`. Use a scoped Bridge bearer token provisioned by
+the server administrator. Token administration is local-only on the server.
+
+```sh
+paseo-bridge auth login --mode token  # API origin, then hidden Bearer token
+paseo-bridge auth status
+paseo-bridge status list-host-status -o json
+paseo-bridge status get-host-status HOST -o json
+paseo-bridge workspaces list-workspaces --host all -o json
+paseo-bridge agents list-agents --host HOST -o json
+paseo-bridge wait get-agent-snapshot HOST AGENT -o json
+paseo-bridge activity get-agent-activity HOST AGENT --tail 20 -o json
+paseo-bridge observation observe-agent HOST AGENT --include activity -o ndjson
+
+# A real send; prompt is required, interrupt defaults to false.
+PASEO_BRIDGE_WRITE_MODE=write paseo-bridge send send-message HOST AGENT 'prompt: Check the test results'
+```
+
+SSE observation uses one connection (the server closes it within 60 seconds).
+Use `--rsh-max-items 100` to limit the number of events; reconnect manually
+with backoff when needed. SSE `error` events remain visible in output and must be
+inspected. `include=activity` requires both wait and activity scopes. Idle is an
+agent snapshot, not proof that a particular message completed. Inspect `partial`,
+`unknown`, `retrySafe`, and activity gap/epoch indicators in API responses.
+A 202 send is accepted, not completed; never resend an uncertain message to
+recover observation. No automatic send retry occurs, including after 401,
+rate limits, network failure, or body-preserving redirects; Restish unsafe-retry
+flags and environment overrides cannot enable it.
+
+Config is stored at `$XDG_CONFIG_HOME/aicli/paseo-bridge/config.toml` with mode
+`0600` (directory `0700`). `--context NAME` isolates credentials and caches.
+Environment overrides do not rewrite configuration:
+
+- `PASEO_BRIDGE_BASE_URL`: API origin without a path prefix.
+- `PASEO_BRIDGE_ACCESS_TOKEN`: scoped bearer token.
+- `PASEO_BRIDGE_SPEC_URL`: optional alternate spec URL; discovery sends no token.
+- `PASEO_BRIDGE_CONTEXT`: selected account context.
+- `PASEO_BRIDGE_WRITE_MODE`: `readonly` (default), `write`, or `destructive`.
+
+Branded CLI configuration ignores `--rsh-config`; authenticated response caching
+is disabled. External OpenAPI references and cross-origin credential attachment
+are rejected. Documentation and browser assets are excluded from generated commands.
+
+```sh
+just test-paseo-bridge
+just paseo-bridge-spec-check
+just build-paseo-bridge
 ```
