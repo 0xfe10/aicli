@@ -93,7 +93,6 @@ jobs:
           - hast
           - ozon
           - lanhu
-          - devopsh
         goos:
           - linux
           - darwin
@@ -102,13 +101,6 @@ jobs:
           - amd64
           - arm64
         exclude:
-          - command: devopsh
-            goos: windows
-            goarch: amd64
-          - command: devopsh
-            goos: windows
-            goarch: arm64
-
           - command: hast
             goos: windows
             goarch: amd64
