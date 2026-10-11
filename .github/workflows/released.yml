@@ -90,7 +90,6 @@ jobs:
           - fns
           - itsaplan
           - paseo-bridge
-          - hast
           - ozon
           - lanhu
         goos:
@@ -100,13 +99,6 @@ jobs:
         goarch:
           - amd64
           - arm64
-        exclude:
-          - command: hast
-            goos: windows
-            goarch: amd64
-          - command: hast
-            goos: windows
-            goarch: arm64
 
     steps:
       - name: Check out release commit
