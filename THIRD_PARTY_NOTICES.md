@@ -1,7 +1,7 @@
 # Third-party notices
 
 This file records licenses for third-party code linked into `pingcode`, `fns`,
-`ozon`, `lanhu`, `itsaplan`, `paseo-bridge`, and `aicli` release binaries.
+`ozon`, `lanhu`, `itsaplan`, and `aicli` release binaries.
 
 Evidence is maintained under `openwiki/compliance/`:
 

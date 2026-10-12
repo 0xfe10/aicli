@@ -89,7 +89,6 @@ jobs:
           - pingcode
           - fns
           - itsaplan
-          - paseo-bridge
           - ozon
           - lanhu
         goos:
