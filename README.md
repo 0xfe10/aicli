@@ -299,34 +299,62 @@ Environment overrides do not rewrite configuration:
 - `PASEO_BRIDGE_CONTEXT`: selected account context.
 - `PASEO_BRIDGE_WRITE_MODE`: `readonly` (default), `write`, or `destructive`.
 
-Central business requests require E2EE. Existing token-only configurations must
-add `e2ee_file = "/absolute/path/e2ee.json"` at the top level of `config.toml`
-(or use `PASEO_BRIDGE_E2EE_FILE`). The JSON file is:
+Central business requests require E2EE. Keep the existing `e2ee_file` setting
+(or `PASEO_BRIDGE_E2EE_FILE`) and provision version 2 locally:
 
 ```json
-{"version":1,"keyFile":"/absolute/path/client.key","hosts":{"aspen":"BASE64_RAW_X25519_PUBLIC_KEY","birch":"BASE64_RAW_X25519_PUBLIC_KEY"}}
+{"version":2,"stateDir":"/absolute/protected/state","hosts":{"aspen":{"serverId":"PINNED_SERVER_ID","daemonPublicKeyB64":"PRIVATE_PAIRING_CAPABILITY","passwordFile":"/optional/protected/password"},"birch":{"serverId":"PINNED_SERVER_ID","daemonPublicKeyB64":"PRIVATE_PAIRING_CAPABILITY"}}}
 ```
 
-The key file contains the standard base64 encoding of a 32-byte X25519 private
-key. Both files must be regular, owned by the current user, and mode `0600` or
-stricter. Windows binaries can run auth, documentation, and version commands,
-but E2EE business operations fail closed until Windows file ACL verification
-is implemented. Provision the client's SHA-256 public-key fingerprint in each host's
-allowlist, and verify host public keys through an independent trusted channel;
-never obtain pins from the central broker. Private keys stay on their owner.
-Requests fail closed when configuration, pins, or response authentication fail.
-There is no plaintext fallback. `host=all` queries fan out locally to pinned
-hosts and report per-host errors as partial results.
+The native client is a pure Go binary. Each command checks owner admission at
+`/api/v1/native/hosts` (which contains server IDs only), then connects through the
+center's transparent WebSocket proxy to the original Paseo Relay. The CLI pins
+the daemon identity locally; the center cannot provide or replace these pins.
+Only an authenticated, encrypted `server_info` opens the daemon session.
+Existing commands and output shapes remain available; no new command flag,
+Node runtime, local listener, or permanent endpoint process is required.
 
-The center sees routing metadata (host, client fingerprint, operation, request
-ID, expiry, frame sizes/timing) and bearer-token authorization, but cannot read
-paths, agent IDs, prompts, snapshots, or activity. Encrypted SSE is verified
-frame by frame; truncation is an error. Nonstreaming responses are exposed only
-after the authenticated end frame. Limits are 256 KiB per request body, 16 MiB
-per host response, and 150 seconds per encrypted operation. A failed send can
-still have been delivered: do not resend automatically. Static host/client keys
-do not provide forward secrecy; compromise requires key rotation and pin updates.
-OpenAPI discovery is public and is not encrypted.
+**Treat `daemonPublicKeyB64` as a secret pairing capability.** Although it is a
+cryptographic public key, the native Relay handshake allows its holder to open
+an owner session. Do not put it in the center, logs, source control, or release
+artifacts. Provision pins through an independent trusted channel. Optional
+daemon passwords appear only in the encrypted hello, never HTTP/WS headers.
+Only trusted owner clients with all six Bridge operations may use native mode;
+restricted tokens are rejected. Native Relay grants broad daemon access and
+cannot preserve per-operation restrictions after the encrypted handshake.
+
+Configuration and password files must be regular, owned by the current user,
+mode `0600` or stricter, and not symlinks. State directories are owner-only
+`0700`. Windows binaries can run auth, documentation, and version commands,
+but E2EE business operations fail closed until file ACL verification exists.
+The state directory preserves existing `submissions/HOST.AGENT.json` guards.
+Before any send, the CLI fsyncs a durable guard and sends its UUID as the daemon's
+`messageId`. Only a confirmed acceptance clears it. An unresolved send blocks
+later sends, including after restart; reconcile it locally instead of retrying.
+Idle and accepted status do not prove completion of a specific message.
+
+The center sees bearer authorization, host/server routing, ephemeral client
+public keys, frame sizes and timing. Agent IDs, prompts, snapshots, timelines,
+and passwords stay inside native NaCl encryption. Native crypto has no bound
+sequence number or operation and does not inherently reject replay within a
+connection. The CLI rejects repeated incoming nonces, matches response type and
+request ID, and uses fresh ephemeral keys per connection; send guards and daemon
+message IDs protect dispatch uncertainty. These measures do not claim general
+native protocol protection against all replay/reordering by a hostile relay.
+
+Native operations have a 150-second deadline, 16 MiB decrypted-response budget,
+and bounded frame counts. Queries of `host=all` fan out locally to pinned hosts;
+failures are partial results. Native SSE refreshes snapshots/activity using
+read-only RPCs every two seconds. Reconnect starts a fresh snapshot and emits
+resync for an existing event cursor; there is no durable replay or automatic
+reconnect/resend. OpenAPI discovery is public and unencrypted.
+
+Version 1 protected E2EE files remain supported during migration. They contain
+`{version:1,keyFile:"/absolute/client.key",hosts:{HOST:"BASE64_RAW_PUBLIC_KEY"}}`
+and use the prior X25519/HKDF/AES-GCM broker protocol and its host-side endpoint.
+The key file contains standard base64 of a 32-byte private key. Version 1 static
+keys do not provide forward secrecy. There is no plaintext fallback in either
+version; missing pins or authentication failures reject business requests.
 
 Branded CLI configuration ignores `--rsh-config`; authenticated response caching
 is disabled. External OpenAPI references and cross-origin credential attachment
