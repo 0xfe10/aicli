@@ -175,6 +175,14 @@ func TestFullSpecGeneratedCommands(t *testing.T) {
 		err := RunCLIWithContext(cli, append([]string{"itsaplan"}, args...), sel)
 		return out.String(), err
 	}
+	// Load the full corpus using explicit sync; cold help discovery has a
+	// three-second metadata budget that races with CI instrumentation.
+	prime := NewCLIWithContext(cfg, session, "test", "test", sel)
+	prime.SetCommandSurface(restish.CommandSurface{})
+	prime.Stdout, prime.Stderr = io.Discard, io.Discard
+	if err := RunCLIWithContext(prime, []string{"itsaplan", "api", "sync", "itsaplan"}, sel); err != nil {
+		t.Fatal(err)
+	}
 	out, err := run("--help")
 	if err != nil {
 		t.Fatal(err)
