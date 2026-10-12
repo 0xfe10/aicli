@@ -36,6 +36,7 @@ type e2eeConfig struct {
 	Hosts   map[string]string `json:"hosts"`
 }
 type e2eeKeys struct {
+	native  *nativeConfig
 	private *ecdh.PrivateKey
 	client  string
 	hosts   map[string]*ecdh.PublicKey
@@ -104,6 +105,19 @@ func loadE2EE(path string) (*e2eeKeys, error) {
 	b, err := protectedRead(path)
 	if err != nil {
 		return nil, err
+	}
+	var version struct {
+		Version int `json:"version"`
+	}
+	if json.Unmarshal(b, &version) != nil {
+		return nil, fmt.Errorf("invalid E2EE configuration")
+	}
+	if version.Version == 2 {
+		native, err := loadNativeConfig(b)
+		if err != nil {
+			return nil, err
+		}
+		return &e2eeKeys{native: native}, nil
 	}
 	var c e2eeConfig
 	if err = strictJSON(b, &c); err != nil {
@@ -271,6 +285,9 @@ func (t *encryptedTransport) RoundTrip(r *http.Request) (*http.Response, error) 
 	return t.one(r, host, op)
 }
 func (t *encryptedTransport) one(r *http.Request, host, op string) (*http.Response, error) {
+	if t.keys.native != nil {
+		return t.nativeOne(r, host, op)
+	}
 	pub, ok := t.keys.hosts[host]
 	if !ok {
 		return nil, fmt.Errorf("Bridge host has no verified E2EE pin")
@@ -505,12 +522,25 @@ func (t *encryptedTransport) fanout(r *http.Request, op string) (*http.Response,
 		return nil, fmt.Errorf("E2EE fanout only supports reads")
 	}
 	hosts := make([]string, 0, len(t.keys.hosts))
-	for h := range t.keys.hosts {
-		hosts = append(hosts, h)
+	if t.keys.native != nil {
+		for h := range t.keys.native.Hosts {
+			hosts = append(hosts, h)
+		}
+	} else {
+		for h := range t.keys.hosts {
+			hosts = append(hosts, h)
+		}
 	}
 	sort.Strings(hosts)
 	results := []any{}
 	partial := false
+	totalBytes := 0
+	failedHost := func(host string) any {
+		if op == "status" {
+			return map[string]any{"host": host, "fetchedAt": nativeFetchedAt(), "state": "unavailable"}
+		}
+		return map[string]any{"host": host, "fetchedAt": nativeFetchedAt(), "error": map[string]string{"code": "e2ee_failed", "message": "Encrypted host request failed"}}
+	}
 	for _, host := range hosts {
 		clone := r.Clone(r.Context())
 		u := *r.URL
@@ -525,11 +555,15 @@ func (t *encryptedTransport) fanout(r *http.Request, op string) (*http.Response,
 		resp, err := t.one(clone, host, op)
 		if err != nil {
 			partial = true
-			results = append(results, map[string]any{"host": host, "fetchedAt": time.Now().UTC().Format(time.RFC3339), "error": map[string]string{"code": "e2ee_failed", "message": "Encrypted host request failed"}})
+			results = append(results, failedHost(host))
 			continue
 		}
 		b, e := io.ReadAll(resp.Body)
 		resp.Body.Close()
+		totalBytes += len(b)
+		if totalBytes > maxEncryptedResponse {
+			return nil, fmt.Errorf("encrypted aggregate response limit exceeded; narrow the host selection")
+		}
 		var data struct {
 			OK   bool `json:"ok"`
 			Data struct {
@@ -539,7 +573,7 @@ func (t *encryptedTransport) fanout(r *http.Request, op string) (*http.Response,
 		}
 		if e != nil || resp.StatusCode != 200 || json.Unmarshal(b, &data) != nil || !data.OK {
 			partial = true
-			results = append(results, map[string]any{"host": host, "fetchedAt": time.Now().UTC().Format(time.RFC3339), "error": map[string]string{"code": "e2ee_failed", "message": "Encrypted host request failed"}})
+			results = append(results, failedHost(host))
 			continue
 		}
 		partial = partial || data.Data.Partial
