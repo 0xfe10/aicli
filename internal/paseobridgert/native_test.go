@@ -3,6 +3,7 @@ package paseobridgert
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -40,7 +41,7 @@ func newNativeFixture(t *testing.T) *nativeFixture {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/native/hosts", func(w http.ResponseWriter, r *http.Request) {
 		f.directoryCalls.Add(1)
-		if r.Header.Get("Authorization") != "Bearer owner" {
+		if r.Header.Get("Authorization") != "Bearer owner" || r.Header.Get("User-Agent") != "paseo-bridge/native-relay" {
 			w.WriteHeader(403)
 			return
 		}
@@ -53,7 +54,11 @@ func newNativeFixture(t *testing.T) *nativeFixture {
 	})
 	mux.Handle("/api/v1/native/connect/test", websocket.Handler(func(ws *websocket.Conn) {
 		defer ws.Close()
-		if ws.Request().Header.Get("Authorization") != "Bearer owner" || ws.Request().Header.Get("X-Paseo-Password") != "" || ws.Request().URL.Query().Get("role") != "client" || ws.Request().URL.Query().Get("serverId") != "daemon-1" {
+		if ws.Request().TLS.NegotiatedProtocol != "http/1.1" {
+			t.Error("native WebSocket must negotiate HTTP/1.1")
+			return
+		}
+		if ws.Request().Header.Get("User-Agent") != "paseo-bridge/native-relay" || ws.Request().Header.Get("Authorization") != "Bearer owner" || ws.Request().Header.Get("X-Paseo-Password") != "" || ws.Request().URL.Query().Get("role") != "client" || ws.Request().URL.Query().Get("serverId") != "daemon-1" {
 			t.Error("invalid upgrade authentication/routing")
 			return
 		}
@@ -123,8 +128,8 @@ func newNativeFixture(t *testing.T) *nativeFixture {
 		if !ok {
 			return
 		}
-		if stringField(helloApp, "type") != "hello" {
-			t.Error("missing encrypted hello")
+		if stringField(helloApp, "type") != "hello" || objectField(helloApp, "capabilities")["all_providers"] != true {
+			t.Error("missing encrypted hello or all-provider support")
 			return
 		}
 		if stringField(objectField(helloApp, "auth"), "password") == "synthetic-password" {
@@ -204,7 +209,10 @@ func newNativeFixture(t *testing.T) *nativeFixture {
 			}
 		}
 	}))
-	f.server = httptest.NewTLSServer(mux)
+	f.server = httptest.NewUnstartedServer(mux)
+	f.server.EnableHTTP2 = true
+	f.server.TLS = &tls.Config{NextProtos: []string{"h2", "http/1.1"}}
+	f.server.StartTLS()
 	t.Cleanup(f.server.Close)
 	dir := t.TempDir()
 	passwordFile := filepath.Join(dir, "password")
@@ -221,7 +229,9 @@ func newNativeFixture(t *testing.T) *nativeFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.transport = &encryptedTransport{base: f.server.Client().Transport, origin: f.server.URL, keys: keys}
+	base := f.server.Client().Transport.(*http.Transport)
+	base.ForceAttemptHTTP2 = true
+	f.transport = &encryptedTransport{base: base, origin: f.server.URL, keys: keys}
 	return f
 }
 func (f *nativeFixture) request(t *testing.T, path, method, body string) (*http.Response, error) {

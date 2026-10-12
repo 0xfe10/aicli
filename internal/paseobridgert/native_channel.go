@@ -109,6 +109,7 @@ func (t *encryptedTransport) nativeConnect(ctx context.Context, host, authorizat
 		return nil, nativeFailure
 	}
 	cfg.Header.Set("Authorization", authorization)
+	cfg.Header.Set("User-Agent", "paseo-bridge/native-relay")
 	cfg.Dialer = &net.Dialer{Timeout: 8 * time.Second}
 	cfg.TlsConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 	if transport, ok := t.base.(*http.Transport); ok && transport.TLSClientConfig != nil {
@@ -120,6 +121,9 @@ func (t *encryptedTransport) nativeConnect(ctx context.Context, host, authorizat
 			return nil, fmt.Errorf("native Relay refuses unverified TLS")
 		}
 	}
+	// Classic WebSocket upgrade uses HTTP/1.1. The directory HTTP transport
+	// may have enabled h2 on its shared TLS config; never inherit that ALPN.
+	cfg.TlsConfig.NextProtos = []string{"http/1.1"}
 	handshakeCtx, handshakeCancel := context.WithTimeout(ctx, 8*time.Second)
 	ws, err := cfg.DialContext(handshakeCtx)
 	handshakeCancel()
@@ -161,7 +165,7 @@ func (t *encryptedTransport) nativeConnect(ctx context.Context, host, authorizat
 	if json.Unmarshal(ready.data, &r) != nil || r.Type != "e2ee_ready" {
 		return nil, nativeFailure
 	}
-	appHello := map[string]any{"type": "hello", "clientId": clientID, "clientType": "cli", "protocolVersion": 1, "capabilities": map[string]bool{"hello_rejection": true, "explicit_event_subscriptions": true}}
+	appHello := map[string]any{"type": "hello", "clientId": clientID, "clientType": "cli", "protocolVersion": 1, "capabilities": map[string]bool{"hello_rejection": true, "explicit_event_subscriptions": true, "all_providers": true}}
 	if password != "" {
 		appHello["auth"] = map[string]string{"kind": "password", "password": password}
 	}
@@ -199,6 +203,7 @@ func (t *encryptedTransport) nativeDirectory(ctx context.Context, authorization,
 		return nativeFailure
 	}
 	req.Header.Set("Authorization", authorization)
+	req.Header.Set("User-Agent", "paseo-bridge/native-relay")
 	req.Header.Set("Cache-Control", "no-store")
 	resp, err := t.base.RoundTrip(req)
 	if err != nil {
