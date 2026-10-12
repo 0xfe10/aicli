@@ -365,3 +365,5 @@ just test-paseo-bridge
 just paseo-bridge-spec-check
 just build-paseo-bridge
 ```
+
+The native Relay release uses Go 1.27.2 and compatible Go support-library security patches. Compliance gates imported-package and symbol findings; raw module-only warnings remain recorded, while missing or unknown traces fail closed. Native NaCl code is covered by the Go cryptography BSD notice included in release archives.

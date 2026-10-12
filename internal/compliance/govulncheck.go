@@ -13,7 +13,8 @@ import (
 // FindingEvent is the subset of govulncheck -json output used for gating.
 type FindingEvent struct {
 	Finding *struct {
-		OSV string `json:"osv"`
+		OSV   string                       `json:"osv"`
+		Trace []map[string]json.RawMessage `json:"trace"`
 	} `json:"finding"`
 }
 
@@ -63,7 +64,9 @@ func ParseAllowlist(r io.Reader) ([]string, error) {
 	return ids, nil
 }
 
-// CollectFindingIDs reads govulncheck -json stream and returns unique OSV IDs.
+// CollectFindingIDs gates imported-package and symbol findings. Module-only
+// findings describe code outside the binary closure and remain in raw evidence.
+// Missing, empty or unfamiliar trace shapes are retained conservatively.
 func CollectFindingIDs(r io.Reader) ([]string, error) {
 	dec := json.NewDecoder(r)
 	seen := map[string]bool{}
@@ -83,11 +86,25 @@ func CollectFindingIDs(r io.Reader) ([]string, error) {
 		if id == "" || seen[id] {
 			continue
 		}
+		if moduleOnlyTrace(event.Finding.Trace) {
+			continue
+		}
 		seen[id] = true
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
 	return ids, nil
+}
+
+func moduleOnlyTrace(trace []map[string]json.RawMessage) bool {
+	if len(trace) != 1 || len(trace[0]) != 2 {
+		return false
+	}
+	var module, version string
+	if json.Unmarshal(trace[0]["module"], &module) != nil || json.Unmarshal(trace[0]["version"], &version) != nil {
+		return false
+	}
+	return strings.TrimSpace(module) != "" && strings.TrimSpace(version) != ""
 }
 
 // UnapprovedFindings returns found IDs that are not in the allowlist.

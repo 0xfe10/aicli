@@ -51,3 +51,27 @@ func TestCollectFindingsRejectsInvalidJSON(t *testing.T) {
 		t.Fatal("expected JSON error")
 	}
 }
+
+func TestFindingsRetainAffectedPackagesAndUnknownTraces(t *testing.T) {
+	for _, trace := range []string{
+		`[{"module":"example","version":"v1","package":"example/vulnerable"}]`,
+		`[{"module":"example","version":"v1","function":"Vulnerable"}]`,
+		`[]`, `null`, `[{}]`, `[{"module":"example","version":"v1","unknown":"future"}]`,
+	} {
+		input := `{"finding":{"osv":"GO-2026-9999","trace":` + trace + `}}`
+		got, err := CollectFindingIDs(strings.NewReader(input))
+		if err != nil || len(got) != 1 {
+			t.Fatalf("trace %s: %v, %v", trace, got, err)
+		}
+	}
+	input := `{"finding":{"osv":"GO-2026-9999","trace":[{"module":"example","version":"v1"}]}}`
+	got, err := CollectFindingIDs(strings.NewReader(input))
+	if err != nil || len(got) != 0 {
+		t.Fatalf("module-only: %v, %v", got, err)
+	}
+	input += `{"finding":{"osv":"GO-2026-9999","trace":[{"module":"example","version":"v1","package":"example/vulnerable"}]}}`
+	got, err = CollectFindingIDs(strings.NewReader(input))
+	if err != nil || len(got) != 1 {
+		t.Fatalf("later package finding lost: %v, %v", got, err)
+	}
+}
