@@ -9,6 +9,7 @@ require (
 	github.com/pb33f/libopenapi v0.35.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/rest-sh/restish/v2 v2.3.0
+	github.com/spf13/cobra v1.10.2
 	golang.org/x/crypto v0.57.0
 	golang.org/x/net v0.60.0
 	golang.org/x/term v0.46.0
@@ -63,7 +64,6 @@ require (
 	github.com/sandrolain/httpcache v1.4.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/shamaton/msgpack/v3 v3.1.2 // indirect
-	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/tailscale/hujson v0.0.0-20260302212456-ecc657c15afd // indirect
 	github.com/tidwall/jsonc v0.3.3 // indirect

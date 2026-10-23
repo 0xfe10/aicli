@@ -14,6 +14,10 @@ support_commands:
     - auth login --mode token
     - auth status
     - auth logout
+local_commands:
+  - usage: pingcode attachment download <url> --workitem <workitem-id> [--output <file>]
+    mode: read
+    output: JSON absolute local path
 examples:
   - name: pingcode auth login --mode client
     mode: setup

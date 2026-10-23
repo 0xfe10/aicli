@@ -78,6 +78,31 @@ Configuration:
 - `PINGCODE_SPEC_URL`: defaults to `https://open.pingcode.com/api_data.json`
 - `RSH_CACHE_DIR`: optional Restish HTTP/spec cache override; branded CLIs ignore Restish config overrides
 
+### Description images
+
+The generated attachment commands return attachment metadata. Inline description
+images are separate resources and may be absent from that list. Download one with:
+
+```sh
+pingcode attachment download \
+  'https://atlas.pingcode.com/files/public/FILE_ID' \
+  --workitem WORKITEM_ID --output screenshot.jpg
+```
+
+The command uses the selected context, reads the work item with
+`include_public_image_token=description`, and passes its scoped `public_image_token`
+to Atlas as the `token` query parameter. It never sends the API bearer to Atlas or
+the storage server, or prints the image token. No manual token copying is needed.
+The image URL must belong to that work item's description. Standard Atlas URLs
+and their `/origin-url` variants are supported.
+
+HTTPS redirects to storage preserve signed URLs and remove authorization and
+referrer headers. HTTP failures, JSON business errors (including HTTP 200), HTML
+responses and files exceeding 100 MiB fail without publishing a partial file.
+The command returns JSON containing an absolute local `path`; files have mode
+`0600`. Omit `--output` for a unique filename with a detected extension. Existing
+files are never overwritten. Only `GET` requests are used, so readonly mode works.
+
 ## Fast Note Sync (`fns`)
 
 Save a Bearer token created in the FNS WebGUI
