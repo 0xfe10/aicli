@@ -119,7 +119,7 @@ func NewCLIWithContext(cfg Config, session Session, version, commit string, sele
 	cli.SetCommandName("pingcode")
 	cli.SetCommandDescription(
 		"PingCode API CLI",
-		"CLI generated from the official PingCode API description.\n\nLocal commands:\n  auth login|status|logout   manage Base URL and credentials\n  context current|list|use  select an account context\n\nConfiguration:\n  --context selects an account for one invocation.\n  --rsh-config is ignored; use pingcode auth or PINGCODE_* environment variables.\n",
+		"CLI generated from the official PingCode API description.\n\nLocal commands:\n  attachment download URL  download a description image\n  auth login|status|logout   manage Base URL and credentials\n  context current|list|use  select an account context\n\nConfiguration:\n  --context selects an account for one invocation.\n  --rsh-config is ignored; use pingcode auth or PINGCODE_* environment variables.\n",
 	)
 	cli.SetVersion(formatVersion(version, commit))
 	cli.SetDefaultConfig(&restish.Config{APIs: map[string]*restish.APIConfig{

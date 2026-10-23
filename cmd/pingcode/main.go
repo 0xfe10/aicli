@@ -45,6 +45,13 @@ func main() {
 		fmt.Fprintln(os.Stderr, pingcodert.RedactSecrets(err.Error()))
 		os.Exit(1)
 	}
+	if handled, err := pingcodert.MaybeRunAttachment(args, session, selection, os.Stdout, os.Stderr); handled {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, pingcodert.RedactSecrets(err.Error()))
+			os.Exit(1)
+		}
+		return
+	}
 	cfg, err := pingcodert.ConfigFromSession(session)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, pingcodert.RedactSecrets(err.Error()))
